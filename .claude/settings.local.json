@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(gh auth status:*)",
+      "Bash(git config:*)",
+      "Bash(git credential-manager:*)",
+      "Bash(git credential-manager-core:*)",
+      "Bash(ssh:*)",
+      "Bash(sudo dnf install:*)",
+      "Bash(hash:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
