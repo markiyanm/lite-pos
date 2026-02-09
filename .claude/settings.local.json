@@ -12,7 +12,40 @@
       "Bash(sudo dnf install:*)",
       "Bash(hash:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(claude mcp add:*)",
+      "WebFetch(domain:www.shadcn-svelte.com)",
+      "Bash(claude mcp remove:*)",
+      "Bash(claude mcp list:*)",
+      "WebSearch",
+      "WebFetch(domain:v2.tauri.app)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:thatgurjot.com)",
+      "WebFetch(domain:mainmatter.com)",
+      "WebFetch(domain:dev.to)",
+      "Bash(node --version:*)",
+      "Bash(pnpm:*)",
+      "Bash(cargo:*)",
+      "Bash(rustc --version:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(bun:*)",
+      "Bash(corepack enable:*)",
+      "Bash(corepack prepare:*)",
+      "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
+      "Bash(curl:*)",
+      "Bash(sh:*)",
+      "Bash(source:*)",
+      "Bash(rpm -q:*)",
+      "Bash(dpkg -l:*)",
+      "Bash(rpm -qa:*)",
+      "Bash(pkg-config:*)",
+      "Bash(export PATH=\"$HOME/.local/bin:$HOME/.cargo/bin:$PATH\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sveltekit"
+  ],
+  "enableAllProjectMcpServers": true
 }
