@@ -197,11 +197,24 @@
 					{#each filteredProducts() as product (product.id)}
 						<TableRow class={!product.is_active ? "opacity-50" : ""}>
 							<TableCell>
-								<div>
-									<p class="font-medium">{product.name}</p>
-									{#if product.description}
-										<p class="text-sm text-muted-foreground line-clamp-1">{product.description}</p>
+								<div class="flex items-center gap-3">
+									{#if product.image_path}
+										<img
+											src={product.image_path}
+											alt={product.name}
+											class="h-8 w-8 shrink-0 rounded object-cover"
+										/>
+									{:else}
+										<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted">
+											<Package class="h-4 w-4 text-muted-foreground" />
+										</div>
 									{/if}
+									<div>
+										<p class="font-medium">{product.name}</p>
+										{#if product.description}
+											<p class="text-sm text-muted-foreground line-clamp-1">{product.description}</p>
+										{/if}
+									</div>
 								</div>
 							</TableCell>
 							<TableCell class="font-mono text-sm">

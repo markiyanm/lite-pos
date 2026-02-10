@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Settings, Save, Loader2 } from "lucide-svelte";
+	import { Settings, Save, Loader2, Sun, Moon, Monitor, ImagePlus, X } from "lucide-svelte";
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from "$lib/components/ui/tabs/index.js";
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -10,12 +10,16 @@
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { updateSetting, getAllSettings } from "$lib/commands/settings.js";
 	import { session } from "$lib/stores/session.svelte.js";
+	import { mode, setMode } from "mode-watcher";
+	import { readFileAsDataUrl } from "$lib/utils.js";
 
 	// Local copies of settings for editing
 	let storeName = $state(settingsStore.get("store_name"));
 	let storeAddress = $state(settingsStore.get("store_address"));
 	let storePhone = $state(settingsStore.get("store_phone"));
 	let storeEmail = $state(settingsStore.get("store_email"));
+	let storeLogo = $state(settingsStore.get("store_logo"));
+	let logoFileInput = $state<HTMLInputElement>(undefined!);
 	let currencySymbol = $state(settingsStore.get("currency_symbol"));
 	let currencyCode = $state(settingsStore.get("currency_code"));
 
@@ -38,6 +42,18 @@
 
 	let saving = $state(false);
 	let saveMessage = $state("");
+
+	async function handleLogoSelect(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			storeLogo = await readFileAsDataUrl(file, 128);
+		} catch {
+			// silent
+		}
+		input.value = "";
+	}
 
 	function togglePaymentMethod(method: string) {
 		if (paymentMethodsEnabled.includes(method)) {
@@ -66,6 +82,7 @@
 
 		try {
 			await Promise.all([
+				updateSetting("store_logo", storeLogo),
 				updateSetting("store_name", storeName),
 				updateSetting("store_address", storeAddress),
 				updateSetting("store_phone", storePhone),
@@ -134,6 +151,7 @@
 			<TabsTrigger value="printing">Printing</TabsTrigger>
 			<TabsTrigger value="inventory">Inventory</TabsTrigger>
 			<TabsTrigger value="orders">Orders</TabsTrigger>
+			<TabsTrigger value="appearance">Appearance</TabsTrigger>
 			{#if session.isAdmin}
 				<TabsTrigger value="employees">Employees</TabsTrigger>
 			{/if}
@@ -147,6 +165,46 @@
 					<CardDescription>Your business details displayed on receipts and throughout the app.</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4">
+					<div class="space-y-2">
+						<p class="text-sm font-medium">Store Logo</p>
+						<div class="flex items-center gap-4">
+							{#if storeLogo}
+								<div class="relative">
+									<img
+										src={storeLogo}
+										alt="Store logo"
+										class="h-16 w-16 rounded-lg border object-contain"
+									/>
+									<button
+										type="button"
+										class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+										onclick={() => (storeLogo = "")}
+									>
+										<X class="h-3 w-3" />
+									</button>
+								</div>
+							{:else}
+								<div class="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed bg-muted/50">
+									<ImagePlus class="h-6 w-6 text-muted-foreground/50" />
+								</div>
+							{/if}
+							<div>
+								<input
+									bind:this={logoFileInput}
+									type="file"
+									accept="image/*"
+									class="hidden"
+									onchange={handleLogoSelect}
+								/>
+								<Button variant="outline" size="sm" onclick={() => logoFileInput.click()}>
+									<ImagePlus class="mr-2 h-4 w-4" />
+									{storeLogo ? "Change Logo" : "Upload Logo"}
+								</Button>
+								<p class="mt-1 text-xs text-muted-foreground">Shown in the sidebar and on receipts.</p>
+							</div>
+						</div>
+					</div>
+					<Separator />
 					<SettingField
 						label="Store Name"
 						value={storeName}
@@ -319,6 +377,44 @@
 						checked={requireCustomerOnOrder}
 						onchange={(v) => (requireCustomerOnOrder = v)}
 					/>
+				</CardContent>
+			</Card>
+		</TabsContent>
+
+		<!-- Appearance -->
+		<TabsContent value="appearance">
+			<Card>
+				<CardHeader>
+					<CardTitle>Theme</CardTitle>
+					<CardDescription>Choose how the app looks. Select a theme preference below.</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<div class="flex gap-3">
+						<button
+							type="button"
+							class="flex flex-1 flex-col items-center gap-2 rounded-lg border-2 p-4 transition-colors {mode.current === 'light' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+							onclick={() => setMode("light")}
+						>
+							<Sun class="h-6 w-6" />
+							<span class="text-sm font-medium">Light</span>
+						</button>
+						<button
+							type="button"
+							class="flex flex-1 flex-col items-center gap-2 rounded-lg border-2 p-4 transition-colors {mode.current === 'dark' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+							onclick={() => setMode("dark")}
+						>
+							<Moon class="h-6 w-6" />
+							<span class="text-sm font-medium">Dark</span>
+						</button>
+						<button
+							type="button"
+							class="flex flex-1 flex-col items-center gap-2 rounded-lg border-2 p-4 transition-colors {mode.current !== 'light' && mode.current !== 'dark' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+							onclick={() => setMode("system")}
+						>
+							<Monitor class="h-6 w-6" />
+							<span class="text-sm font-medium">System</span>
+						</button>
+					</div>
 				</CardContent>
 			</Card>
 		</TabsContent>

@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
-	import { Package, ArrowLeft, Save, Loader2 } from "lucide-svelte";
+	import { Package, ArrowLeft, Save, Loader2, ImagePlus, X } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
@@ -20,6 +20,7 @@
 	import { getCategories } from "$lib/commands/categories.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import type { Category } from "$lib/types/index.js";
+	import { readFileAsDataUrl } from "$lib/utils.js";
 
 	const paramId = $derived(page.params.id as string);
 	const isNew = $derived(paramId === "new");
@@ -42,6 +43,8 @@
 	let stockQuantity = $state("0");
 	let lowStockThreshold = $state("5");
 	let isActive = $state(true);
+	let imagePath = $state<string | null>(null);
+	let imageFileInput = $state<HTMLInputElement>(undefined!);
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
@@ -70,6 +73,7 @@
 					stockQuantity = String(product.stock_quantity);
 					lowStockThreshold = String(product.low_stock_threshold);
 					isActive = Boolean(product.is_active);
+					imagePath = product.image_path ?? null;
 				} else {
 					error = "Product not found.";
 				}
@@ -98,6 +102,18 @@
 		return Math.round(val * 100);
 	}
 
+	async function handleImageSelect(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			imagePath = await readFileAsDataUrl(file, 400);
+		} catch {
+			// silent
+		}
+		input.value = "";
+	}
+
 	async function handleSave() {
 		error = "";
 
@@ -123,7 +139,7 @@
 				tax_rate_bps: percentToBps(taxRate),
 				stock_quantity: parseInt(stockQuantity, 10) || 0,
 				low_stock_threshold: parseInt(lowStockThreshold, 10) || 5,
-				image_path: null,
+				image_path: imagePath,
 				is_active: isActive,
 				sort_order: 0
 			};
@@ -272,6 +288,53 @@
 
 			<!-- Sidebar (1 col) -->
 			<div class="space-y-6">
+				<Card>
+					<CardHeader>
+						<CardTitle>Product Image</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="flex flex-col items-center gap-3">
+							{#if imagePath}
+								<div class="relative w-full">
+									<img
+										src={imagePath}
+										alt="Product"
+										class="w-full rounded-md border object-cover"
+									/>
+									<Button
+										variant="destructive"
+										size="icon"
+										class="absolute right-1 top-1 h-6 w-6"
+										onclick={() => (imagePath = null)}
+									>
+										<X class="h-3 w-3" />
+									</Button>
+								</div>
+							{:else}
+								<div class="flex h-32 w-full items-center justify-center rounded-md border border-dashed bg-muted/50">
+									<ImagePlus class="h-8 w-8 text-muted-foreground/50" />
+								</div>
+							{/if}
+							<input
+								bind:this={imageFileInput}
+								type="file"
+								accept="image/*"
+								class="hidden"
+								onchange={handleImageSelect}
+							/>
+							<Button
+								variant="outline"
+								size="sm"
+								class="w-full"
+								onclick={() => imageFileInput.click()}
+							>
+								<ImagePlus class="mr-2 h-4 w-4" />
+								{imagePath ? "Change Image" : "Upload Image"}
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+
 				<Card>
 					<CardHeader>
 						<CardTitle>Status</CardTitle>

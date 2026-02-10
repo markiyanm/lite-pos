@@ -5,6 +5,7 @@
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import UpdateChecker from "$lib/components/app/UpdateChecker.svelte";
 	import { Toaster } from "$lib/components/ui/sonner/index.js";
+	import { ModeWatcher } from "mode-watcher";
 	import { session } from "$lib/stores/session.svelte.js";
 
 	let { children } = $props();
@@ -69,5 +70,6 @@
 	</div>
 {/if}
 
+<ModeWatcher />
 <Toaster richColors position="bottom-right" />
 <UpdateChecker />

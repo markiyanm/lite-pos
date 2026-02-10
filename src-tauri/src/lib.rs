@@ -9,6 +9,12 @@ pub fn run() {
             sql: include_str!("../migrations/001_initial.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "add store logo and theme settings",
+            sql: include_str!("../migrations/002_settings_logo_theme.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

@@ -35,3 +35,39 @@ export function formatCurrency(cents: number, symbol = "$"): string {
 export function formatBps(bps: number): string {
 	return (bps / 100).toFixed(2);
 }
+
+export function resizeImage(dataUrl: string, maxWidth: number): Promise<string> {
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => {
+			let { width, height } = img;
+			if (width > maxWidth) {
+				height = Math.round((height * maxWidth) / width);
+				width = maxWidth;
+			}
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext("2d")!;
+			ctx.drawImage(img, 0, 0, width, height);
+			resolve(canvas.toDataURL("image/jpeg", 0.85));
+		};
+		img.src = dataUrl;
+	});
+}
+
+export function readFileAsDataUrl(file: File, maxWidth: number): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = async () => {
+			try {
+				const result = await resizeImage(reader.result as string, maxWidth);
+				resolve(result);
+			} catch (e) {
+				reject(e);
+			}
+		};
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(file);
+	});
+}

@@ -103,6 +103,17 @@
 						class="flex flex-col rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50 active:bg-accent"
 						onclick={() => onProductClick(product)}
 					>
+						{#if product.image_path}
+							<img
+								src={product.image_path}
+								alt={product.name}
+								class="mb-2 h-20 w-full rounded object-cover"
+							/>
+						{:else}
+							<div class="mb-2 flex h-20 w-full items-center justify-center rounded bg-muted">
+								<Package class="h-8 w-8 text-muted-foreground/30" />
+							</div>
+						{/if}
 						<p class="mb-1 text-sm font-medium leading-tight line-clamp-2">{product.name}</p>
 						<p class="mt-auto text-sm font-semibold text-primary">
 							{formatCurrency(product.sale_price_cents, currencySymbol)}
