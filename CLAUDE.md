@@ -37,8 +37,9 @@ src/routes/
 │   └── [id]/+page.svelte   # Customer form + order history
 ├── orders/
 │   ├── +page.svelte        # Orders list with filters, stats cards
-│   └── [id]/+page.svelte   # Order detail + refund/void
-└── settings/+page.svelte   # Tabbed settings (7 sections)
+│   └── [id]/+page.svelte   # Order detail + refund/void + customer assign
+├── reports/+page.svelte    # Reports: sales over time, product metrics, inventory
+└── settings/+page.svelte   # Tabbed settings (8 sections incl. Appearance)
 ```
 
 ### Stores (`src/lib/stores/`)
@@ -61,6 +62,7 @@ Raw SQL via `$lib/db/index.ts` (select/execute wrappers). Page components never 
 - **orders.ts** — `getOrders()`, `getOrder()`, `getOrderItems()`, `getOrderPayments()`, `getNextOrderNumber()`, `createOrder()`, `addOrderItem()`, `completeOrder()`, `voidOrder()`
 - **payments.ts** — `addPayment()`
 - **refunds.ts** — `createRefund()`, `addRefundItem()`, `getRefundsByOrder()`, `setOrderRefunded()`
+- **reports.ts** — `getSalesByPeriod()`, `getProductMetrics()`, `getInventorySummary()`
 - **settings.ts** — `getAllSettings()`, `getSetting()`, `updateSetting()`, `getSettingsByGroup()`
 
 ### Database

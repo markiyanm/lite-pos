@@ -119,3 +119,7 @@ export async function completeOrder(orderId: number): Promise<void> {
 export async function voidOrder(orderId: number): Promise<void> {
 	await execute("UPDATE orders SET status = 'void' WHERE id = ?", [orderId]);
 }
+
+export async function updateOrderCustomer(orderId: number, customerId: number | null): Promise<void> {
+	await execute("UPDATE orders SET customer_id = ? WHERE id = ?", [customerId, orderId]);
+}

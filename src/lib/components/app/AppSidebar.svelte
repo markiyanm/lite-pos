@@ -11,7 +11,8 @@
 		LogOut,
 		Store,
 		PanelLeftClose,
-		PanelLeftOpen
+		PanelLeftOpen,
+		BarChart3
 	} from "lucide-svelte";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -49,6 +50,7 @@
 		{
 			label: "Administration",
 			items: [
+				{ label: "Reports", href: "/reports", icon: BarChart3 },
 				{ label: "Settings", href: "/settings", icon: Settings }
 			]
 		}

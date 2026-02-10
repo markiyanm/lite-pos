@@ -4,7 +4,8 @@
 	import { goto } from "$app/navigation";
 	import {
 		ClipboardList, ArrowLeft, Loader2, Ban,
-		RotateCcw, CreditCard, Banknote, FileCheck, User
+		RotateCcw, CreditCard, Banknote, FileCheck, User,
+		UserPlus, X, Search
 	} from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
@@ -30,8 +31,8 @@
 		DialogDescription,
 		DialogFooter
 	} from "$lib/components/ui/dialog/index.js";
-	import { getOrder, getOrderItems, getOrderPayments, voidOrder } from "$lib/commands/orders.js";
-	import { getCustomer } from "$lib/commands/customers.js";
+	import { getOrder, getOrderItems, getOrderPayments, voidOrder, updateOrderCustomer } from "$lib/commands/orders.js";
+	import { getCustomer, getCustomers } from "$lib/commands/customers.js";
 	import { adjustStock } from "$lib/commands/products.js";
 	import { getRefundsByOrder, createRefund, addRefundItem, setOrderRefunded } from "$lib/commands/refunds.js";
 	import { session } from "$lib/stores/session.svelte.js";
@@ -59,6 +60,23 @@
 	let refunding = $state(false);
 	let refundReason = $state("");
 	let refundItems = $state<{ orderItemId: number; name: string; maxQty: number; qty: number; unitCents: number; taxBps: number; restock: boolean }[]>([]);
+
+	// Customer dialog
+	let customerDialogOpen = $state(false);
+	let customerSearch = $state("");
+	let allCustomers = $state<Customer[]>([]);
+	let customerLoading = $state(false);
+
+	const filteredCustomers = $derived(() => {
+		if (!customerSearch.trim()) return allCustomers;
+		const q = customerSearch.toLowerCase();
+		return allCustomers.filter(
+			(c) =>
+				`${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
+				(c.email && c.email.toLowerCase().includes(q)) ||
+				(c.phone && c.phone.includes(q))
+		);
+	});
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
@@ -214,6 +232,45 @@
 			toast.error("Failed to process refund");
 		} finally {
 			refunding = false;
+		}
+	}
+
+	// Customer management
+	async function openCustomerDialog() {
+		customerSearch = "";
+		customerLoading = true;
+		customerDialogOpen = true;
+		try {
+			allCustomers = await getCustomers();
+		} catch {
+			toast.error("Failed to load customers");
+		} finally {
+			customerLoading = false;
+		}
+	}
+
+	async function assignCustomer(c: Customer) {
+		if (!order) return;
+		try {
+			await updateOrderCustomer(order.id, c.id);
+			customer = c;
+			order.customer_id = c.id;
+			customerDialogOpen = false;
+			toast.success(`Customer ${c.first_name} ${c.last_name} assigned`);
+		} catch {
+			toast.error("Failed to assign customer");
+		}
+	}
+
+	async function removeCustomer() {
+		if (!order) return;
+		try {
+			await updateOrderCustomer(order.id, null);
+			customer = null;
+			order.customer_id = null;
+			toast.success("Customer removed from order");
+		} catch {
+			toast.error("Failed to remove customer");
 		}
 	}
 </script>
@@ -434,8 +491,18 @@
 
 				<!-- Customer -->
 				<Card>
-					<CardHeader>
+					<CardHeader class="flex flex-row items-center justify-between space-y-0">
 						<CardTitle>Customer</CardTitle>
+						{#if customer}
+							<div class="flex gap-1">
+								<Button variant="ghost" size="icon" class="h-7 w-7" onclick={openCustomerDialog} title="Change customer">
+									<UserPlus class="h-3.5 w-3.5" />
+								</Button>
+								<Button variant="ghost" size="icon" class="h-7 w-7 text-destructive" onclick={removeCustomer} title="Remove customer">
+									<X class="h-3.5 w-3.5" />
+								</Button>
+							</div>
+						{/if}
 					</CardHeader>
 					<CardContent>
 						{#if customer}
@@ -455,7 +522,13 @@
 								</div>
 							</button>
 						{:else}
-							<p class="text-sm text-muted-foreground">No customer attached</p>
+							<div class="flex flex-col items-center gap-3 py-2">
+								<p class="text-sm text-muted-foreground">No customer attached</p>
+								<Button variant="outline" size="sm" onclick={openCustomerDialog}>
+									<UserPlus class="mr-2 h-4 w-4" />
+									Assign Customer
+								</Button>
+							</div>
 						{/if}
 					</CardContent>
 				</Card>
@@ -566,5 +639,54 @@
 				Process Refund
 			</Button>
 		</DialogFooter>
+	</DialogContent>
+</Dialog>
+
+<!-- Customer Selection Dialog -->
+<Dialog bind:open={customerDialogOpen}>
+	<DialogContent class="sm:max-w-md">
+		<DialogHeader>
+			<DialogTitle>Select Customer</DialogTitle>
+			<DialogDescription>
+				Search and select a customer to assign to this order.
+			</DialogDescription>
+		</DialogHeader>
+		<div class="space-y-3 py-2">
+			<div class="relative">
+				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+				<Input
+					bind:value={customerSearch}
+					placeholder="Search customers..."
+					class="pl-9"
+				/>
+			</div>
+			{#if customerLoading}
+				<div class="flex justify-center py-6">
+					<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+				</div>
+			{:else if filteredCustomers().length === 0}
+				<p class="py-6 text-center text-sm text-muted-foreground">No customers found.</p>
+			{:else}
+				<div class="max-h-64 space-y-1 overflow-y-auto">
+					{#each filteredCustomers() as c (c.id)}
+						<button
+							type="button"
+							class="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50"
+							onclick={() => assignCustomer(c)}
+						>
+							<div class="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+								<User class="h-4 w-4 text-muted-foreground" />
+							</div>
+							<div>
+								<p class="text-sm font-medium">{c.first_name} {c.last_name}</p>
+								{#if c.email}
+									<p class="text-xs text-muted-foreground">{c.email}</p>
+								{/if}
+							</div>
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
 	</DialogContent>
 </Dialog>
