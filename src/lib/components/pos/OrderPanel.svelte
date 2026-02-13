@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Minus, Plus, Trash2, ShoppingCart, FileText, X, Users, ChevronsUpDown, Check } from "lucide-svelte";
+	import { Minus, Plus, Trash2, ShoppingCart, FileText, X, Users, ChevronsUpDown, Check, UserPlus, Loader2 } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
@@ -16,9 +16,20 @@
 		CommandItem,
 		CommandList
 	} from "$lib/components/ui/command/index.js";
+	import {
+		Dialog,
+		DialogContent,
+		DialogHeader,
+		DialogTitle,
+		DialogFooter,
+		DialogDescription
+	} from "$lib/components/ui/dialog/index.js";
+	import { Input } from "$lib/components/ui/input/index.js";
+	import { Label } from "$lib/components/ui/label/index.js";
 	import { formatCurrency } from "$lib/utils.js";
 	import { orderStore } from "$lib/stores/order.svelte.js";
-	import { getCustomers } from "$lib/commands/customers.js";
+	import { getCustomers, getCustomer, createCustomer } from "$lib/commands/customers.js";
+	import { toast } from "svelte-sonner";
 	import type { Customer } from "$lib/types/index.js";
 
 	interface Props {
@@ -70,6 +81,59 @@
 				(c.phone && c.phone.includes(q))
 		);
 	});
+
+	let quickAddOpen = $state(false);
+	let quickAddFirst = $state("");
+	let quickAddLast = $state("");
+	let quickAddSaving = $state(false);
+
+	function openQuickAdd() {
+		customerPopoverOpen = false;
+		quickAddFirst = "";
+		quickAddLast = "";
+		quickAddOpen = true;
+	}
+
+	async function handleQuickAddCustomer() {
+		const firstName = quickAddFirst.trim();
+		const lastName = quickAddLast.trim();
+		if (!firstName || !lastName) {
+			toast.error("First name and last name are required");
+			return;
+		}
+
+		quickAddSaving = true;
+		try {
+			const { lastInsertId } = await createCustomer({
+				first_name: firstName,
+				last_name: lastName,
+				email: null,
+				phone: null,
+				billing_address_line1: null,
+				billing_address_line2: null,
+				billing_city: null,
+				billing_state: null,
+				billing_zip: null,
+				shipping_address_line1: null,
+				shipping_address_line2: null,
+				shipping_city: null,
+				shipping_state: null,
+				shipping_zip: null,
+				notes: null
+			});
+			const newCustomer = await getCustomer(lastInsertId);
+			if (newCustomer) {
+				orderStore.setCustomer(newCustomer);
+				customersLoaded = false;
+				toast.success(`Customer "${firstName} ${lastName}" created`);
+			}
+			quickAddOpen = false;
+		} catch (err) {
+			toast.error("Failed to create customer");
+		} finally {
+			quickAddSaving = false;
+		}
+	}
 </script>
 
 <div class="flex h-full flex-col border-l bg-card">
@@ -134,6 +198,10 @@
 									</div>
 								</CommandItem>
 							{/each}
+							<CommandItem value="__new_customer__" onSelect={openQuickAdd}>
+								<UserPlus class="mr-2 h-4 w-4" />
+								New Customer
+							</CommandItem>
 						</CommandGroup>
 					</CommandList>
 				</Command>
@@ -231,3 +299,44 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Quick Add Customer Dialog -->
+<Dialog bind:open={quickAddOpen}>
+	<DialogContent class="sm:max-w-sm">
+		<DialogHeader>
+			<DialogTitle>New Customer</DialogTitle>
+			<DialogDescription>Add a customer to this order.</DialogDescription>
+		</DialogHeader>
+		<div class="space-y-4 py-2">
+			<div class="space-y-2">
+				<Label for="quick-add-first">First Name</Label>
+				<Input
+					id="quick-add-first"
+					placeholder="First name"
+					bind:value={quickAddFirst}
+					disabled={quickAddSaving}
+				/>
+			</div>
+			<div class="space-y-2">
+				<Label for="quick-add-last">Last Name</Label>
+				<Input
+					id="quick-add-last"
+					placeholder="Last name"
+					bind:value={quickAddLast}
+					disabled={quickAddSaving}
+				/>
+			</div>
+		</div>
+		<DialogFooter>
+			<Button variant="outline" onclick={() => (quickAddOpen = false)} disabled={quickAddSaving}>
+				Cancel
+			</Button>
+			<Button onclick={handleQuickAddCustomer} disabled={quickAddSaving}>
+				{#if quickAddSaving}
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				{/if}
+				Save
+			</Button>
+		</DialogFooter>
+	</DialogContent>
+</Dialog>

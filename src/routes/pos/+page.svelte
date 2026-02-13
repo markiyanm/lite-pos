@@ -17,12 +17,13 @@
 	} from "$lib/commands/orders.js";
 	import { addPayment } from "$lib/commands/payments.js";
 	import { toast } from "svelte-sonner";
-	import type { Product, Category, PaymentMethod } from "$lib/types/index.js";
+	import type { Product, Category, PartialPayment } from "$lib/types/index.js";
 
 	let products = $state<Product[]>([]);
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
 	let paymentOpen = $state(false);
+	let pendingOrderNumber = $state<string>("");
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
@@ -46,8 +47,11 @@
 		orderStore.addItem(product);
 	}
 
-	function handlePay() {
+	async function handlePay() {
 		if (orderStore.items.length === 0) return;
+
+		// Fetch next order number to use in transaction xInvoice field
+		pendingOrderNumber = await getNextOrderNumber();
 		paymentOpen = true;
 	}
 
@@ -99,11 +103,12 @@
 		orderStore.clear();
 	}
 
-	async function handlePaymentComplete(method: PaymentMethod, amountCents: number) {
+	async function handlePaymentComplete(payments: PartialPayment[]) {
 		if (!session.user) return;
 
 		try {
-			const orderNumber = await getNextOrderNumber();
+			// Use the order number we fetched when opening payment modal
+			const orderNumber = pendingOrderNumber;
 
 			// Create order
 			const { lastInsertId: orderId } = await createOrder({
@@ -140,14 +145,28 @@
 				await adjustStock(item.product.id, -item.quantity);
 			}
 
-			// Record payment
-			const changeCents = Math.max(0, amountCents - orderStore.totalCents);
-			await addPayment({
-				orderId,
-				method,
-				amountCents,
-				changeCents
-			});
+			// Record all payments
+			for (const payment of payments) {
+				let referenceNumber = "";
+
+				if (payment.cardDetails) {
+					referenceNumber = `${payment.cardDetails.cardType} ending in ${payment.cardDetails.lastFour}, Auth: ${payment.cardDetails.authCode}`;
+				}
+
+				await addPayment({
+					orderId,
+					method: payment.method,
+					amountCents: payment.amountCents,
+					changeCents: payment.changeCents,
+					referenceNumber: referenceNumber || undefined,
+					cardAuthCode: payment.cardDetails?.authCode,
+					cardLastFour: payment.cardDetails?.lastFour,
+					cardType: payment.cardDetails?.cardType,
+					cardEntryMode: payment.cardDetails?.entryMode,
+					gatewayRefNum: payment.cardDetails?.gatewayRefNum,
+					gatewayResponse: payment.cardDetails?.gatewayResponse
+				});
+			}
 
 			// Complete order
 			await completeOrder(orderId);
@@ -201,6 +220,7 @@
 	bind:open={paymentOpen}
 	totalCents={orderStore.totalCents}
 	{currencySymbol}
+	invoiceNumber={pendingOrderNumber}
 	onComplete={handlePaymentComplete}
 	onCancel={handlePaymentCancel}
 />

@@ -22,7 +22,26 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "windows": ["main"],
+          "permissions": [
+            {
+              "identifier": "http:default",
+              "allow": [
+                {"url": "https://device.cardknox.com/*"}
+              ]
+            },
+            "http:allow-fetch",
+            "sql:default",
+            "sql:allow-load",
+            "sql:allow-execute",
+            "sql:allow-select"
+          ]
+        }
+      ]
     }
   },
   "bundle": {

@@ -123,6 +123,12 @@ export interface Payment {
 	amount_cents: number;
 	change_cents: number;
 	reference_number: string | null;
+	card_auth_code: string | null;
+	card_last_four: string | null;
+	card_type: string | null;
+	card_entry_mode: string | null;
+	gateway_ref_num: string | null;
+	gateway_response: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -163,6 +169,60 @@ export interface Setting {
 	description: string | null;
 	created_at: string;
 	updated_at: string;
+}
+
+// ---- Sola Gateway ----
+export interface SolaDevice {
+	xDeviceId: string;
+	xDeviceFriendlyName: string;
+	xDeviceSerialNumber: string;
+	xDeviceStatus: "UNKNOWN" | "CONNECTED" | "DISCONNECTED" | "BUSY" | "NOT_REGISTERED" | "UPDATE_NEEDED";
+}
+
+export interface SolaDeviceListResponse {
+	xRefnum: string;
+	xResult: "S" | "E";
+	xDevices: SolaDevice[];
+}
+
+export type SolaCommand = "cc:sale" | "cc:authonly" | "cc:capture" | "cc:void" | "cc:refund";
+export type SolaResult = "A" | "D" | "E"; // Approved, Declined, Error
+
+export interface SolaTransactionRequest {
+	xCommand: SolaCommand;
+	xAmount: string; // Format: "10.99"
+	xDeviceId: string;
+	xInvoice?: string;
+}
+
+export interface SolaTransactionResponse {
+	xRefnum: string;
+	xResult: SolaResult;
+	xStatus: string;
+	xAuthCode?: string;
+	xMaskedCardNumber?: string; // Format: "************1234"
+	xCardType?: string;
+	xName?: string;
+	xExp?: string;
+	xAvsResult?: string;
+	xCvvResult?: string;
+	xError?: string;
+	xAmt?: string;
+	xEntryMethod?: string;
+}
+
+export interface PartialPayment {
+	method: PaymentMethod;
+	amountCents: number;
+	changeCents: number;
+	cardDetails?: {
+		authCode: string;
+		lastFour: string;
+		cardType: string;
+		entryMode: string;
+		gatewayRefNum: string;
+		gatewayResponse: string;
+	};
 }
 
 // ---- POS-specific types ----

@@ -5,7 +5,7 @@
 	import {
 		ClipboardList, ArrowLeft, Loader2, Ban,
 		RotateCcw, CreditCard, Banknote, FileCheck, User,
-		UserPlus, X, Search
+		UserPlus, X, Search, Printer
 	} from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
@@ -39,6 +39,8 @@
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { formatCurrency } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
+	import PaymentDetailsDialog from "$lib/components/orders/PaymentDetailsDialog.svelte";
+	import PrintReceiptDialog from "$lib/components/receipts/PrintReceiptDialog.svelte";
 	import type { Order, OrderItem, Payment, Customer, Refund } from "$lib/types/index.js";
 
 	const paramId = $derived(page.params.id as string);
@@ -67,6 +69,13 @@
 	let allCustomers = $state<Customer[]>([]);
 	let customerLoading = $state(false);
 
+	// Payment details dialog
+	let paymentDetailsOpen = $state(false);
+	let selectedPayment = $state<Payment | null>(null);
+
+	// Print receipt dialog
+	let printReceiptOpen = $state(false);
+
 	const filteredCustomers = $derived(() => {
 		if (!customerSearch.trim()) return allCustomers;
 		const q = customerSearch.toLowerCase();
@@ -79,6 +88,13 @@
 	});
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
+	const storeName = $derived(settingsStore.get("store_name") || "Store");
+	const storeAddress = $derived(settingsStore.get("store_address") || "");
+	const storePhone = $derived(settingsStore.get("store_phone") || "");
+	const taxLabel = $derived(settingsStore.get("tax_label") || "Tax");
+	const printerType = $derived(
+		(settingsStore.get("printer_type") || "standard") as "standard" | "thermal"
+	);
 
 	const refundTotalCents = $derived(() => {
 		return refundItems.reduce((sum, ri) => {
@@ -152,6 +168,16 @@
 			hour: "2-digit",
 			minute: "2-digit"
 		});
+	}
+
+	function openPaymentDetails(payment: Payment) {
+		selectedPayment = payment;
+		paymentDetailsOpen = true;
+	}
+
+	function closePaymentDetails() {
+		paymentDetailsOpen = false;
+		selectedPayment = null;
 	}
 
 	// Void
@@ -292,6 +318,10 @@
 		</div>
 		{#if order && order.status === "completed"}
 			<div class="flex gap-2">
+				<Button variant="outline" onclick={() => (printReceiptOpen = true)}>
+					<Printer class="mr-2 h-4 w-4" />
+					Print Receipt
+				</Button>
 				<Button variant="outline" onclick={openRefundDialog}>
 					<RotateCcw class="mr-2 h-4 w-4" />
 					Refund
@@ -375,7 +405,14 @@
 							<div class="space-y-3">
 								{#each payments as payment (payment.id)}
 									{@const Icon = paymentMethodIcon(payment.method)}
-									<div class="flex items-center justify-between rounded-md border p-3">
+									{@const isCardPayment = payment.method === "credit_card" && payment.gateway_response}
+									<div
+										class="flex items-center justify-between rounded-md border p-3 {isCardPayment ? 'cursor-pointer hover:bg-accent transition-colors' : ''}"
+										role={isCardPayment ? "button" : undefined}
+										tabindex={isCardPayment ? 0 : undefined}
+										onclick={() => isCardPayment && openPaymentDetails(payment)}
+										onkeydown={(e) => isCardPayment && (e.key === "Enter" || e.key === " ") && openPaymentDetails(payment)}
+									>
 										<div class="flex items-center gap-3">
 											<Icon class="h-5 w-5 text-muted-foreground" />
 											<div>
@@ -383,6 +420,11 @@
 												<p class="text-xs text-muted-foreground">
 													{formatDate(payment.created_at)}
 												</p>
+												{#if payment.card_last_four}
+													<p class="text-xs text-muted-foreground">
+														{payment.card_type || "Card"} ending in {payment.card_last_four}
+													</p>
+												{/if}
 											</div>
 										</div>
 										<div class="text-right">
@@ -391,6 +433,9 @@
 												<p class="text-xs text-muted-foreground">
 													Change: {formatCurrency(payment.change_cents, currencySymbol)}
 												</p>
+											{/if}
+											{#if isCardPayment}
+												<p class="text-xs text-muted-foreground mt-1">Click for details</p>
 											{/if}
 										</div>
 									</div>
@@ -690,3 +735,27 @@
 		</div>
 	</DialogContent>
 </Dialog>
+
+<!-- Payment details dialog -->
+<PaymentDetailsDialog
+	bind:open={paymentDetailsOpen}
+	payment={selectedPayment}
+	{currencySymbol}
+	onClose={closePaymentDetails}
+/>
+
+<!-- Print receipt dialog -->
+<PrintReceiptDialog
+	bind:open={printReceiptOpen}
+	{order}
+	{items}
+	{payments}
+	{customer}
+	{storeName}
+	{storeAddress}
+	{storePhone}
+	{taxLabel}
+	{currencySymbol}
+	{printerType}
+	onClose={() => (printReceiptOpen = false)}
+/>

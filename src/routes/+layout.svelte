@@ -7,10 +7,24 @@
 	import { Toaster } from "$lib/components/ui/sonner/index.js";
 	import { ModeWatcher } from "mode-watcher";
 	import { session } from "$lib/stores/session.svelte.js";
+	import { settingsStore } from "$lib/stores/settings.svelte.js";
+	import { themeStore } from "$lib/stores/theme.svelte.js";
+	import { untrack } from "svelte";
 
 	let { children } = $props();
 
 	const isLoginPage = $derived(page.url.pathname === "/login");
+
+	// Load theme once when settings are loaded (use untrack to prevent reactive loops)
+	let hasLoadedTheme = false;
+	$effect(() => {
+		if (settingsStore.loaded && !hasLoadedTheme) {
+			hasLoadedTheme = true;
+			untrack(() => {
+				themeStore.loadFromSettings();
+			});
+		}
+	});
 
 	// Route guard: redirect to login if not authenticated
 	$effect(() => {
