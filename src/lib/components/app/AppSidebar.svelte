@@ -18,6 +18,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { session } from "$lib/stores/session.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
+	import { log } from "$lib/utils/logger.js";
 
 	let collapsed = $state(
 		typeof localStorage !== "undefined" && localStorage.getItem("sidebar-collapsed") === "true"
@@ -61,6 +62,7 @@
 	}
 
 	function handleLogout() {
+		log.info("auth", `User logged out: user="${session.user?.name}"`);
 		session.logout();
 		goto("/login");
 	}

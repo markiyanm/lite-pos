@@ -1,5 +1,6 @@
 import { execute } from "$lib/db/index.js";
 import type { PaymentMethod } from "$lib/types/index.js";
+import { log } from "$lib/utils/logger.js";
 
 export async function addPayment(payment: {
 	orderId: number;
@@ -15,6 +16,8 @@ export async function addPayment(payment: {
 	gatewayResponse?: string;
 }): Promise<{ lastInsertId: number }> {
 	const uuid = crypto.randomUUID();
+	const lastFourDisplay = payment.cardLastFour ? ` card=****${payment.cardLastFour}` : "";
+	log.info("payment", `Payment processed: order=${payment.orderId} method=${payment.method} amount=$${(payment.amountCents / 100).toFixed(2)}${lastFourDisplay}`);
 	return execute(
 		`INSERT INTO payments (
 			uuid, order_id, method, amount_cents, change_cents, reference_number,

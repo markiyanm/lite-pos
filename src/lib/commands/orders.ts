@@ -1,5 +1,6 @@
 import { select, execute } from "$lib/db/index.js";
 import type { Order, OrderItem, Payment } from "$lib/types/index.js";
+import { log } from "$lib/utils/logger.js";
 
 export async function getOrders(opts?: {
 	status?: string;
@@ -81,11 +82,13 @@ export async function createOrder(order: {
 	status?: string;
 }): Promise<{ lastInsertId: number }> {
 	const uuid = crypto.randomUUID();
-	return execute(
+	const result = await execute(
 		`INSERT INTO orders (uuid, order_number, status, customer_id, user_id, subtotal_cents, discount_cents, tax_total_cents, total_cents, notes)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[uuid, order.orderNumber, order.status ?? "draft", order.customerId ?? null, order.userId, order.subtotalCents, order.discountCents, order.taxTotalCents, order.totalCents, order.notes ?? null]
 	);
+	log.info("order", `Order created: ${order.orderNumber} total=$${(order.totalCents / 100).toFixed(2)}`);
+	return result;
 }
 
 export async function addOrderItem(item: {
@@ -114,10 +117,12 @@ export async function completeOrder(orderId: number): Promise<void> {
 		"UPDATE orders SET status = 'completed', completed_at = datetime('now') WHERE id = ?",
 		[orderId]
 	);
+	log.info("order", `Order completed: id=${orderId}`);
 }
 
 export async function voidOrder(orderId: number): Promise<void> {
 	await execute("UPDATE orders SET status = 'void' WHERE id = ?", [orderId]);
+	log.warn("order", `Order voided: id=${orderId}`);
 }
 
 export async function updateOrderCustomer(orderId: number, customerId: number | null): Promise<void> {

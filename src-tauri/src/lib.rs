@@ -1,6 +1,7 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 mod crypto;
+mod logging;
 mod sola;
 mod printing;
 
@@ -61,6 +62,24 @@ pub fn run() {
             sql: include_str!("../migrations/009_receipt_mode.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 10,
+            description: "add ifields key setting for CNP payments",
+            sql: include_str!("../migrations/010_ifields_key.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 11,
+            description: "add logging/diagnostics settings",
+            sql: include_str!("../migrations/011_logging.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 12,
+            description: "add customer payment tokens table for card-on-file",
+            sql: include_str!("../migrations/012_customer_payment_tokens.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -78,8 +97,16 @@ pub fn run() {
             sola::process_sola_transaction,
             sola::cancel_sola_transaction,
             sola::build_sola_request_info,
+            sola::process_sola_cnp_transaction,
+            sola::sola_save_card,
+            sola::process_sola_token_transaction,
             printing::get_system_printers,
-            printing::print_receipt
+            printing::print_receipt,
+            logging::log_event,
+            logging::get_log_entries,
+            logging::get_log_dates,
+            logging::export_log,
+            logging::purge_old_logs
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -89,6 +116,11 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Purge old log files on startup (default 30 days, errors are non-fatal)
+            let handle = app.handle().clone();
+            let _ = logging::purge_old_logs(handle, None);
+
             Ok(())
         })
         .run(tauri::generate_context!())

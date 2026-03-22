@@ -10,7 +10,8 @@
 	import { session } from "$lib/stores/session.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
-	import { untrack } from "svelte";
+	import { untrack, onMount } from "svelte";
+	import { log } from "$lib/utils/logger.js";
 
 	let { children } = $props();
 
@@ -25,6 +26,11 @@
 		if (pathname.startsWith("/products/")) return true;
 		return false;
 	}
+
+	// Log app startup
+	onMount(() => {
+		log.info("startup", `App started: platform=${navigator.platform}`);
+	});
 
 	// Load theme once when settings are loaded (use untrack to prevent reactive loops)
 	let hasLoadedTheme = false;

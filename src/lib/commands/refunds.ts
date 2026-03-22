@@ -1,5 +1,6 @@
 import { select, execute } from "$lib/db/index.js";
 import type { Refund } from "$lib/types/index.js";
+import { log } from "$lib/utils/logger.js";
 
 export async function getRefundsByOrder(orderId: number): Promise<Refund[]> {
 	return select<Refund>("SELECT * FROM refunds WHERE order_id = ? ORDER BY created_at DESC", [orderId]);
@@ -12,6 +13,7 @@ export async function createRefund(refund: {
 	reason?: string;
 }): Promise<{ lastInsertId: number }> {
 	const uuid = crypto.randomUUID();
+	log.info("order", `Refund created: order=${refund.orderId} amount=$${(refund.totalRefundCents / 100).toFixed(2)} reason="${refund.reason ?? "none"}"`);
 	return execute(
 		`INSERT INTO refunds (uuid, order_id, user_id, total_refund_cents, reason)
 		 VALUES (?, ?, ?, ?, ?)`,

@@ -1,6 +1,7 @@
 import { select, execute } from "$lib/db/index.js";
 import type { User } from "$lib/types/index.js";
 import { hashPin } from "$lib/commands/crypto.js";
+import { log } from "$lib/utils/logger.js";
 
 export async function login(pin: string): Promise<User | null> {
 	const hashed = await hashPin(pin);
@@ -11,6 +12,7 @@ export async function login(pin: string): Promise<User | null> {
 		[hashed]
 	);
 	if (hashedMatch[0]) {
+		log.info("auth", `Login successful: user="${hashedMatch[0].name}" role=${hashedMatch[0].role}`);
 		return hashedMatch[0];
 	}
 
@@ -22,9 +24,11 @@ export async function login(pin: string): Promise<User | null> {
 	if (rawMatch[0]) {
 		// Migrate the user's PIN to hashed on successful login
 		await execute("UPDATE users SET pin_hash = ? WHERE id = ?", [hashed, rawMatch[0].id]);
+		log.info("auth", `Login successful (PIN migrated): user="${rawMatch[0].name}" role=${rawMatch[0].role}`);
 		return rawMatch[0];
 	}
 
+	log.warn("auth", "Login failed: invalid PIN");
 	return null;
 }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Settings, Save, Loader2, Sun, Moon, Monitor, ImagePlus, X, Eye, EyeOff, CreditCard, Wifi, Pencil, Check, Trash2, Plus, Printer } from "lucide-svelte";
+	import { Settings, Save, Loader2, Sun, Moon, Monitor, ImagePlus, X, Eye, EyeOff, CreditCard, Wifi, Pencil, Check, Trash2, Plus, Printer, FileText } from "lucide-svelte";
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from "$lib/components/ui/tabs/index.js";
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -32,6 +32,8 @@
 	import { getAllThemes, type Theme } from "$lib/themes.js";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import PrintReceiptDialog from "$lib/components/receipts/PrintReceiptDialog.svelte";
+	import LogViewerDialog from "$lib/components/settings/LogViewerDialog.svelte";
+	import { log } from "$lib/utils/logger.js";
 	import type { Order, OrderItem, Payment, Customer } from "$lib/types/index.js";
 
 	// Local copies of settings for editing
@@ -72,6 +74,12 @@
 	let orderNumberPrefix = $state(settingsStore.get("order_number_prefix"));
 	let requireCustomerOnOrder = $state(settingsStore.getBoolean("require_customer_on_order"));
 
+	// Diagnostics / Logging settings
+	let enableLogging = $state(settingsStore.get("enable_logging") !== "false");
+	let logLevel = $state(settingsStore.get("log_level") || "info");
+	let logRetentionDays = $state(settingsStore.get("log_retention_days") || "30");
+	let logViewerOpen = $state(false);
+
 	// Theme settings
 	let selectedTheme = $state(settingsStore.get("color_theme") || "blue");
 	const availableThemes = getAllThemes();
@@ -104,16 +112,28 @@
 		toast.success(`Brightness set to ${modeLabel}`);
 	}
 
+	// Card on File setting
+	let enableCardOnFile = $state(settingsStore.getBoolean("enable_card_on_file"));
+
 	// Sola Gateway settings
 	let solaCardPresent = $state(settingsStore.getBoolean("sola_gateway_card_present"));
 	let solaCardNotPresent = $state(settingsStore.getBoolean("sola_gateway_card_not_present"));
 	let solaApiKey = $state("");
 	let solaApiKeyVisible = $state(false);
 
+	let ifieldsKey = $state("");
+	let ifieldsKeyVisible = $state(false);
+
 	// Decrypt the stored API key on load
 	const encryptedKey = settingsStore.get("sola_gateway_api_key");
 	if (encryptedKey) {
 		decryptValue(encryptedKey).then((v) => (solaApiKey = v)).catch(() => {});
+	}
+
+	// Decrypt the stored iFields key on load
+	const encryptedIfieldsKey = settingsStore.get("ifields_key");
+	if (encryptedIfieldsKey) {
+		decryptValue(encryptedIfieldsKey).then((v) => (ifieldsKey = v)).catch(() => {});
 	}
 
 	// Device selection state
@@ -500,8 +520,9 @@
 		saveMessage = "";
 
 		try {
-			// Encrypt the API key before saving
+			// Encrypt the API key and iFields key before saving
 			const encryptedApiKey = await encryptValue(solaApiKey);
+			const encryptedIfieldsKey = await encryptValue(ifieldsKey);
 
 			await Promise.all([
 				updateSetting("store_logo", storeLogo),
@@ -525,10 +546,15 @@
 				updateSetting("sola_gateway_card_not_present", String(solaCardNotPresent)),
 				updateSetting("sola_gateway_api_key", encryptedApiKey),
 				updateSetting("sola_gateway_default_device_id", solaDefaultDeviceId),
+				updateSetting("enable_card_on_file", String(enableCardOnFile)),
+				updateSetting("ifields_key", encryptedIfieldsKey),
 				updateSetting("receipt_mode", receiptMode),
 				updateSetting("printer_name", printerName),
 				updateSetting("printer_type", printerType),
-				updateSetting("paper_width_mm", paperWidthMm)
+				updateSetting("paper_width_mm", paperWidthMm),
+				updateSetting("enable_logging", String(enableLogging)),
+				updateSetting("log_level", logLevel),
+				updateSetting("log_retention_days", logRetentionDays)
 				// Note: color_theme is auto-saved on change, not part of main save
 			]);
 
@@ -536,6 +562,7 @@
 			const all = await getAllSettings();
 			settingsStore.load(all);
 
+			log.info("settings", "Settings saved");
 			saveMessage = "Settings saved successfully.";
 			setTimeout(() => (saveMessage = ""), 3000);
 		} catch {
@@ -585,6 +612,7 @@
 			<TabsTrigger value="appearance">Appearance</TabsTrigger>
 			{#if session.isAdmin}
 				<TabsTrigger value="employees">Employees</TabsTrigger>
+				<TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
 			{/if}
 			<TabsTrigger value="about">About</TabsTrigger>
 		</TabsList>
@@ -782,6 +810,41 @@
 								onchange={(v) => (solaCardNotPresent = v)}
 							/>
 
+							{#if solaCardNotPresent}
+								<div class="ml-6 space-y-2 rounded-lg border bg-muted/30 p-4">
+									<div class="grid gap-2">
+										<Label>iFields Key</Label>
+										<div class="flex gap-2">
+											<Input
+												type={ifieldsKeyVisible ? "text" : "password"}
+												value={session.isAdmin ? ifieldsKey : maskApiKey(ifieldsKey)}
+												placeholder="Enter your iFields public key"
+												oninput={(e) => (ifieldsKey = e.currentTarget.value)}
+												disabled={!session.isAdmin}
+												class="font-mono"
+											/>
+											{#if session.isAdmin}
+												<Button
+													variant="outline"
+													size="icon"
+													onclick={() => (ifieldsKeyVisible = !ifieldsKeyVisible)}
+													type="button"
+												>
+													{#if ifieldsKeyVisible}
+														<EyeOff class="h-4 w-4" />
+													{:else}
+														<Eye class="h-4 w-4" />
+													{/if}
+												</Button>
+											{/if}
+										</div>
+										<p class="text-sm text-muted-foreground">
+											Your iFields public key from the Sola Portal (Settings &gt; API Keys &gt; iFields). Encrypted before storage.
+										</p>
+									</div>
+								</div>
+							{/if}
+
 							<!-- SECTION 3: Card Present (moved to bottom) -->
 							<SettingToggle
 								label="Card Present"
@@ -790,6 +853,22 @@
 								disabled={!session.isAdmin}
 								onchange={(v) => (solaCardPresent = v)}
 							/>
+
+							<Separator />
+
+							<!-- Card on File -->
+							<SettingToggle
+								label="Card on File"
+								description="Save and reuse customer card tokens for faster repeat transactions."
+								checked={enableCardOnFile}
+								disabled={!session.isAdmin || !solaApiKey.trim()}
+								onchange={(v) => (enableCardOnFile = v)}
+							/>
+							{#if enableCardOnFile && !solaApiKey.trim()}
+								<p class="ml-6 text-sm text-destructive">
+									Requires API Key to be configured.
+								</p>
+							{/if}
 
 							<!-- SECTION 4: Terminal Selection (NEW - only visible when Card Present enabled) -->
 							{#if solaCardPresent}
@@ -1379,6 +1458,58 @@
 			<EmployeeManagement />
 		</TabsContent>
 
+		<!-- Diagnostics -->
+		<TabsContent value="diagnostics">
+			<Card>
+				<CardHeader>
+					<CardTitle>Diagnostics</CardTitle>
+					<CardDescription>Configure application logging and view system logs.</CardDescription>
+				</CardHeader>
+				<CardContent class="space-y-4">
+					<SettingToggle
+						label="Enable Logging"
+						description="Record application events for troubleshooting and diagnostics."
+						checked={enableLogging}
+						onchange={(v) => (enableLogging = v)}
+					/>
+
+					<div class="space-y-2">
+						<Label>Log Level</Label>
+						<p class="text-sm text-muted-foreground">Minimum severity level to record. Lower levels include all higher severity events.</p>
+						<select
+							class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+							bind:value={logLevel}
+						>
+							<option value="error">Error only</option>
+							<option value="warn">Warning and above</option>
+							<option value="info">Info and above</option>
+							<option value="debug">Debug (all events)</option>
+						</select>
+					</div>
+
+					<div class="space-y-2">
+						<Label>Log Retention (days)</Label>
+						<p class="text-sm text-muted-foreground">Log files older than this will be automatically deleted. Range: 7-90 days.</p>
+						<Input
+							type="number"
+							min="7"
+							max="90"
+							bind:value={logRetentionDays}
+						/>
+					</div>
+
+					<Separator />
+
+					<div class="flex items-center gap-3">
+						<Button onclick={() => (logViewerOpen = true)}>
+							<FileText class="mr-2 h-4 w-4" />
+							View Logs
+						</Button>
+					</div>
+				</CardContent>
+			</Card>
+		</TabsContent>
+
 		<!-- About -->
 		<TabsContent value="about">
 			<div class="space-y-6">
@@ -1447,3 +1578,6 @@
 	{printerName}
 	onClose={() => (testPrintOpen = false)}
 />
+
+<!-- Log Viewer Dialog -->
+<LogViewerDialog bind:open={logViewerOpen} onClose={() => (logViewerOpen = false)} />
