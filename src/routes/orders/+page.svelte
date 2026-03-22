@@ -44,7 +44,7 @@
 		new Map(customers.map((c) => [c.id, c]))
 	);
 
-	const filteredOrders = $derived(() => {
+	const filteredOrders = $derived.by(() => {
 		let result = orders;
 		if (searchQuery.trim()) {
 			const q = searchQuery.toLowerCase();
@@ -75,15 +75,15 @@
 	});
 
 	// Stats derived from filtered orders
-	const stats = $derived(() => {
-		const completed = filteredOrders().filter((o) => o.status === "completed");
+	const stats = $derived.by(() => {
+		const completed = filteredOrders.filter((o) => o.status === "completed");
 		const totalSales = completed.reduce((sum, o) => sum + o.total_cents, 0);
 		const orderCount = completed.length;
 		const avgOrder = orderCount > 0 ? Math.round(totalSales / orderCount) : 0;
 		return { totalSales, orderCount, avgOrder };
 	});
 
-	const statusLabel = $derived(() => {
+	const statusLabel = $derived.by(() => {
 		if (!filterStatus) return "All Statuses";
 		return filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
 	});
@@ -160,7 +160,7 @@
 					<DollarSign class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(stats().totalSales, currencySymbol)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(stats.totalSales, currencySymbol)}</div>
 					<p class="text-xs text-muted-foreground">From completed orders</p>
 				</CardContent>
 			</Card>
@@ -170,7 +170,7 @@
 					<ShoppingCart class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{stats().orderCount}</div>
+					<div class="text-2xl font-bold">{stats.orderCount}</div>
 					<p class="text-xs text-muted-foreground">Completed orders</p>
 				</CardContent>
 			</Card>
@@ -180,7 +180,7 @@
 					<TrendingUp class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(stats().avgOrder, currencySymbol)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(stats.avgOrder, currencySymbol)}</div>
 					<p class="text-xs text-muted-foreground">Per completed order</p>
 				</CardContent>
 			</Card>
@@ -202,7 +202,7 @@
 			value={filterStatus}
 			onValueChange={(v) => (filterStatus = v ?? "")}
 		>
-			<SelectTrigger class="w-40">{statusLabel()}</SelectTrigger>
+			<SelectTrigger class="w-40">{statusLabel}</SelectTrigger>
 			<SelectContent>
 				<SelectItem value="">All Statuses</SelectItem>
 				<SelectItem value="completed">Completed</SelectItem>
@@ -260,7 +260,7 @@
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{#each filteredOrders() as order (order.id)}
+					{#each filteredOrders as order (order.id)}
 						<TableRow
 							class="cursor-pointer"
 							onclick={() => goto(`/orders/${order.id}`)}
@@ -288,7 +288,7 @@
 			</Table>
 		</Card>
 
-		{#if filteredOrders().length === 0 && hasFilters}
+		{#if filteredOrders.length === 0 && hasFilters}
 			<p class="py-8 text-center text-sm text-muted-foreground">
 				No orders match your filters.
 			</p>

@@ -36,12 +36,19 @@
 		open: boolean;
 		totalCents: number;
 		currencySymbol: string;
-		invoiceNumber: string;
 		onComplete: (payments: PartialPayment[]) => void;
 		onCancel: () => void;
 	}
 
-	let { open = $bindable(), totalCents, currencySymbol, invoiceNumber, onComplete, onCancel }: Props = $props();
+	let { open = $bindable(), totalCents, currencySymbol, onComplete, onCancel }: Props = $props();
+
+	// Generate a temporary invoice reference for Sola gateway transactions.
+	// This is NOT the order number — the real order number is assigned when the order is created.
+	let invoiceNumber = $state("");
+
+	function generateInvoiceRef(): string {
+		return `TXN-${Date.now()}`;
+	}
 
 	// Payment method state
 	let selectedMethod = $state<PaymentMethod>("cash");
@@ -74,42 +81,42 @@
 	let partialPayments = $state<PartialPayment[]>([]);
 
 	// Derived values
-	const amountCents = $derived(() => {
+	const amountCents = $derived.by(() => {
 		if (!amountInput) return 0;
 		const val = parseFloat(amountInput);
 		return isNaN(val) ? 0 : Math.round(val * 100);
 	});
 
-	const changeCents = $derived(() => {
-		const paid = amountCents();
-		return Math.max(0, paid - remainingCents());
+	const changeCents = $derived.by(() => {
+		const paid = amountCents;
+		return Math.max(0, paid - remainingCents);
 	});
 
-	const totalPaidCents = $derived(() => {
+	const totalPaidCents = $derived.by(() => {
 		return partialPayments.reduce((sum, p) => sum + p.amountCents, 0);
 	});
 
-	const remainingCents = $derived(() => {
-		return totalCents - totalPaidCents();
+	const remainingCents = $derived.by(() => {
+		return totalCents - totalPaidCents;
 	});
 
-	const canCompleteCash = $derived(() => {
-		return amountCents() >= remainingCents();
+	const canCompleteCash = $derived.by(() => {
+		return amountCents >= remainingCents;
 	});
 
-	const canSendToDevice = $derived(() => {
+	const canSendToDevice = $derived.by(() => {
 		return (
 			cardPaymentType === "card_present" &&
 			selectedDeviceId &&
-			amountCents() > 0 &&
-			amountCents() <= remainingCents() &&
+			amountCents > 0 &&
+			amountCents <= remainingCents &&
 			!processing
 		);
 	});
 
 	// Quick amount suggestions based on remaining balance
-	const quickAmounts = $derived(() => {
-		const remainingDollars = remainingCents() / 100;
+	const quickAmounts = $derived.by(() => {
+		const remainingDollars = remainingCents / 100;
 		const suggestions: number[] = [];
 
 		// Round up to nearest 5, 10, 20, 50
@@ -143,7 +150,7 @@
 	}
 
 	function setExact() {
-		amountInput = (remainingCents() / 100).toFixed(2);
+		amountInput = (remainingCents / 100).toFixed(2);
 	}
 
 	function setQuickAmount(dollars: number) {
@@ -273,7 +280,7 @@
 			const reqInfo = await buildSolaRequestInfo({
 				apiKey: decryptedKey,
 				deviceId: selectedDeviceId,
-				amountCents: amountCents(),
+				amountCents: amountCents,
 				invoiceNumber,
 				command: "cc:sale"
 			});
@@ -284,7 +291,7 @@
 			const txResultData = await processSolaTransaction({
 				apiKey: decryptedKey,
 				deviceId: selectedDeviceId,
-				amountCents: amountCents(),
+				amountCents: amountCents,
 				invoiceNumber
 			});
 
@@ -299,7 +306,7 @@
 
 				partialPayments.push({
 					method: "credit_card",
-					amountCents: amountCents(),
+					amountCents: amountCents,
 					changeCents: 0,
 					cardDetails: {
 						authCode: response.xAuthCode || "",
@@ -312,7 +319,7 @@
 				});
 
 				// Check if fully paid
-				if (remainingCents() === 0) {
+				if (remainingCents === 0) {
 					// Close result dialog and complete order
 					transactionResultOpen = false;
 					onComplete(partialPayments);
@@ -322,7 +329,7 @@
 					selectedMethod = "cash";
 					cardPaymentType = null;
 					toast.success(
-						`Collected ${formatCurrency(amountCents(), currencySymbol)}. ${formatCurrency(remainingCents(), currencySymbol)} remaining.`
+						`Collected ${formatCurrency(amountCents, currencySymbol)}. ${formatCurrency(remainingCents, currencySymbol)} remaining.`
 					);
 				}
 			}
@@ -373,8 +380,8 @@
 	async function handleComplete() {
 		processing = true;
 		try {
-			const amount = selectedMethod === "cash" ? amountCents() : remainingCents();
-			const change = selectedMethod === "cash" ? changeCents() : 0;
+			const amount = selectedMethod === "cash" ? amountCents : remainingCents;
+			const change = selectedMethod === "cash" ? changeCents : 0;
 
 			partialPayments.push({
 				method: selectedMethod,
@@ -392,7 +399,7 @@
 	// Close transaction result dialog
 	function handleResultClose() {
 		transactionResultOpen = false;
-		if (txResult?.response?.xResult === "A" && remainingCents() === 0) {
+		if (txResult?.response?.xResult === "A" && remainingCents === 0) {
 			// Order was completed
 			return;
 		}
@@ -420,7 +427,7 @@
 		if (e.key === "Escape") {
 			onCancel();
 		} else if (e.key === "Enter") {
-			if (selectedMethod === "cash" && canCompleteCash()) {
+			if (selectedMethod === "cash" && canCompleteCash) {
 				handleComplete();
 			}
 		}
@@ -436,6 +443,7 @@
 			partialPayments = [];
 			selectedDeviceId = "";
 			devices = [];
+			invoiceNumber = generateInvoiceRef();
 			// Reset transaction debug state
 			txRequestInfo = null;
 			txResult = null;
@@ -472,11 +480,11 @@
 				<DialogTitle>Collect Payment</DialogTitle>
 				<div class="text-right">
 					<p class="text-lg font-bold text-primary">
-						{formatCurrency(remainingCents(), currencySymbol)}
+						{formatCurrency(remainingCents, currencySymbol)}
 					</p>
 					{#if partialPayments.length > 0}
 						<p class="text-xs text-muted-foreground">
-							{formatCurrency(totalPaidCents(), currencySymbol)} paid
+							{formatCurrency(totalPaidCents, currencySymbol)} paid
 						</p>
 					{/if}
 				</div>
@@ -508,7 +516,7 @@
 					<Separator />
 					<div class="flex items-center justify-between text-sm font-medium">
 						<span>Remaining</span>
-						<span>{formatCurrency(remainingCents(), currencySymbol)}</span>
+						<span>{formatCurrency(remainingCents, currencySymbol)}</span>
 					</div>
 				</div>
 			{/if}
@@ -584,7 +592,7 @@
 							type="number"
 							step="0.01"
 							min="0"
-							max={remainingCents() / 100}
+							max={remainingCents / 100}
 							bind:value={amountInput}
 							placeholder="0.00"
 							disabled={processing}
@@ -597,7 +605,7 @@
 						<Button variant="outline" size="sm" class="flex-1" onclick={setExact} disabled={processing}>
 							Exact
 						</Button>
-						{#each quickAmounts() as amount}
+						{#each quickAmounts as amount}
 							<Button
 								variant="outline"
 								size="sm"
@@ -636,21 +644,21 @@
 				<div class="space-y-1 text-sm">
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Amount Due</span>
-						<span>{formatCurrency(remainingCents(), currencySymbol)}</span>
+						<span>{formatCurrency(remainingCents, currencySymbol)}</span>
 					</div>
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Amount Paid</span>
-						<span>{formatCurrency(amountCents(), currencySymbol)}</span>
+						<span>{formatCurrency(amountCents, currencySymbol)}</span>
 					</div>
-					{#if changeCents() > 0}
+					{#if changeCents > 0}
 						<div class="flex justify-between font-medium text-green-600">
 							<span>Change</span>
-							<span>{formatCurrency(changeCents(), currencySymbol)}</span>
+							<span>{formatCurrency(changeCents, currencySymbol)}</span>
 						</div>
-					{:else if amountInput && amountCents() < remainingCents()}
+					{:else if amountInput && amountCents < remainingCents}
 						<div class="flex justify-between font-medium text-destructive">
 							<span>Remaining</span>
-							<span>{formatCurrency(remainingCents() - amountCents(), currencySymbol)}</span>
+							<span>{formatCurrency(remainingCents - amountCents, currencySymbol)}</span>
 						</div>
 					{/if}
 				</div>
@@ -660,7 +668,7 @@
 					<Button variant="outline" size="sm" class="flex-1" onclick={setExact}>
 						Exact
 					</Button>
-					{#each quickAmounts() as amount}
+					{#each quickAmounts as amount}
 						<Button variant="outline" size="sm" class="flex-1" onclick={() => setQuickAmount(amount)}>
 							{currencySymbol}{amount}
 						</Button>
@@ -698,7 +706,7 @@
 				<!-- Just show the total -->
 				<div class="space-y-2 rounded-md border p-4 text-center">
 					<p class="text-sm text-muted-foreground">Check payment for</p>
-					<p class="text-2xl font-bold">{formatCurrency(remainingCents(), currencySymbol)}</p>
+					<p class="text-2xl font-bold">{formatCurrency(remainingCents, currencySymbol)}</p>
 				</div>
 			{/if}
 
@@ -711,7 +719,7 @@
 				</Button>
 
 				{#if selectedMethod === "credit_card" && cardPaymentType === "card_present"}
-					<Button class="flex-1" disabled={!canSendToDevice()} onclick={handleSendToDevice}>
+					<Button class="flex-1" disabled={!canSendToDevice} onclick={handleSendToDevice}>
 						{#if processing}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
@@ -724,7 +732,7 @@
 				{:else}
 					<Button
 						class="flex-1"
-						disabled={(selectedMethod === "cash" && !canCompleteCash()) || processing}
+						disabled={(selectedMethod === "cash" && !canCompleteCash) || processing}
 						onclick={handleComplete}
 					>
 						{#if processing}
@@ -745,7 +753,7 @@
 	result={txResult}
 	error={txError}
 	pending={txPending}
-	amountCents={amountCents()}
+	amountCents={amountCents}
 	{currencySymbol}
 	onClose={handleResultClose}
 	onCancel={handleCancelTransaction}

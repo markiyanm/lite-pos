@@ -52,7 +52,7 @@
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
-	const orderStats = $derived(() => {
+	const orderStats = $derived.by(() => {
 		const completed = orders.filter((o) => o.status === "completed");
 		const totalSpent = completed.reduce((sum, o) => sum + o.total_cents, 0);
 		return {
@@ -324,12 +324,12 @@
 						<CardContent class="space-y-3">
 							<div class="flex justify-between text-sm">
 								<span class="text-muted-foreground">Total Orders</span>
-								<span class="font-medium">{orderStats().count}</span>
+								<span class="font-medium">{orderStats.count}</span>
 							</div>
 							<Separator />
 							<div class="flex justify-between text-sm">
 								<span class="text-muted-foreground">Total Spent</span>
-								<span class="font-medium">{formatCurrency(orderStats().totalSpent, currencySymbol)}</span>
+								<span class="font-medium">{formatCurrency(orderStats.totalSpent, currencySymbol)}</span>
 							</div>
 						</CardContent>
 					</Card>

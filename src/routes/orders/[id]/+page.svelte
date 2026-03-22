@@ -76,7 +76,7 @@
 	// Print receipt dialog
 	let printReceiptOpen = $state(false);
 
-	const filteredCustomers = $derived(() => {
+	const filteredCustomers = $derived.by(() => {
 		if (!customerSearch.trim()) return allCustomers;
 		const q = customerSearch.toLowerCase();
 		return allCustomers.filter(
@@ -97,7 +97,7 @@
 	);
 	const printerName = $derived(settingsStore.get("printer_name") || "");
 
-	const refundTotalCents = $derived(() => {
+	const refundTotalCents = $derived.by(() => {
 		return refundItems.reduce((sum, ri) => {
 			const lineSubtotal = ri.unitCents * ri.qty;
 			const lineTax = Math.round((lineSubtotal * ri.taxBps) / 10000);
@@ -105,7 +105,7 @@
 		}, 0);
 	});
 
-	const canRefund = $derived(() => {
+	const canRefund = $derived.by(() => {
 		return refundItems.some((ri) => ri.qty > 0);
 	});
 
@@ -218,7 +218,7 @@
 
 		refunding = true;
 		try {
-			const totalRefundCents = refundTotalCents();
+			const totalRefundCents = refundTotalCents;
 
 			// Create refund record
 			const { lastInsertId: refundId } = await createRefund({
@@ -668,7 +668,7 @@
 			<!-- Refund total -->
 			<div class="flex justify-between text-lg font-semibold">
 				<span>Refund Total</span>
-				<span class="text-destructive">{formatCurrency(refundTotalCents(), currencySymbol)}</span>
+				<span class="text-destructive">{formatCurrency(refundTotalCents, currencySymbol)}</span>
 			</div>
 		</div>
 
@@ -677,7 +677,7 @@
 			<Button
 				variant="destructive"
 				onclick={handleRefund}
-				disabled={refunding || !canRefund()}
+				disabled={refunding || !canRefund}
 			>
 				{#if refunding}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -710,11 +710,11 @@
 				<div class="flex justify-center py-6">
 					<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
 				</div>
-			{:else if filteredCustomers().length === 0}
+			{:else if filteredCustomers.length === 0}
 				<p class="py-6 text-center text-sm text-muted-foreground">No customers found.</p>
 			{:else}
 				<div class="max-h-64 space-y-1 overflow-y-auto">
-					{#each filteredCustomers() as c (c.id)}
+					{#each filteredCustomers as c (c.id)}
 						<button
 							type="button"
 							class="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50"

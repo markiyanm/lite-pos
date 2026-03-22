@@ -53,7 +53,7 @@
 		new Map(categories.map((c) => [c.id, c]))
 	);
 
-	const filteredProducts = $derived(() => {
+	const filteredProducts = $derived.by(() => {
 		let result = products;
 		if (searchQuery.trim()) {
 			const q = searchQuery.toLowerCase();
@@ -119,7 +119,7 @@
 		await reload();
 	}
 
-	const filterLabel = $derived(() => {
+	const filterLabel = $derived.by(() => {
 		if (!filterCategoryId) return "All Categories";
 		return categoryMap.get(parseInt(filterCategoryId, 10))?.name ?? "All Categories";
 	});
@@ -153,7 +153,7 @@
 			value={filterCategoryId}
 			onValueChange={(v) => (filterCategoryId = v ?? "")}
 		>
-			<SelectTrigger class="w-48">{filterLabel()}</SelectTrigger>
+			<SelectTrigger class="w-48">{filterLabel}</SelectTrigger>
 			<SelectContent>
 				<SelectItem value="">All Categories</SelectItem>
 				{#each categories as cat}
@@ -194,7 +194,7 @@
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{#each filteredProducts() as product (product.id)}
+					{#each filteredProducts as product (product.id)}
 						<TableRow class={!product.is_active ? "opacity-50" : ""}>
 							<TableCell>
 								<div class="flex items-center gap-3">
@@ -293,7 +293,7 @@
 			</Table>
 		</Card>
 
-		{#if filteredProducts().length === 0 && (searchQuery || filterCategoryId)}
+		{#if filteredProducts.length === 0 && (searchQuery || filterCategoryId)}
 			<p class="py-8 text-center text-sm text-muted-foreground">
 				No products match your filters.
 			</p>

@@ -33,7 +33,7 @@
 	let deletingCustomer = $state<Customer | null>(null);
 	let deleting = $state(false);
 
-	const filteredCustomers = $derived(() => {
+	const filteredCustomers = $derived.by(() => {
 		if (!searchQuery.trim()) return customers;
 		const q = searchQuery.toLowerCase();
 		return customers.filter(
@@ -138,7 +138,7 @@
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{#each filteredCustomers() as customer (customer.id)}
+					{#each filteredCustomers as customer (customer.id)}
 						<TableRow>
 							<TableCell>
 								<button
@@ -196,7 +196,7 @@
 			</Table>
 		</Card>
 
-		{#if filteredCustomers().length === 0 && searchQuery}
+		{#if filteredCustomers.length === 0 && searchQuery}
 			<p class="py-8 text-center text-sm text-muted-foreground">
 				No customers match your search.
 			</p>

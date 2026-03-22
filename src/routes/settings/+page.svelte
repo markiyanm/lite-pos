@@ -237,7 +237,7 @@
 	}
 
 	// Displayed tax rate (convert bps to percentage for display)
-	const taxRateDisplay = $derived(() => {
+	const taxRateDisplay = $derived.by(() => {
 		const bps = parseInt(defaultTaxRateBps || "0", 10);
 		return (bps / 100).toFixed(2);
 	});
@@ -478,7 +478,7 @@
 			const printersPromise = getSystemPrinters();
 			console.log("[Settings] Called getSystemPrinters()...");
 
-			const printers = await Promise.race([printersPromise, timeoutPromise]) as typeof import("$lib/commands/printing").PrinterInfo[];
+			const printers = await Promise.race([printersPromise, timeoutPromise]) as PrinterInfo[];
 			console.log("[Settings] Loaded printers:", printers);
 			console.log("[Settings] Printers count:", printers.length);
 
@@ -694,7 +694,7 @@
 					<SettingField
 						label="Default Tax Rate (%)"
 						description="Applied to new products. Enter as a percentage (e.g., 8.75 for 8.75%)."
-						value={taxRateDisplay()}
+						value={taxRateDisplay}
 						type="number"
 						placeholder="0.00"
 						onchange={(v) => (defaultTaxRateBps = taxRateFromPercent(v))}

@@ -48,7 +48,7 @@
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
-	const categoryLabel = $derived(() => {
+	const categoryLabel = $derived.by(() => {
 		if (!categoryId) return "No Category";
 		const cat = categories.find((c) => String(c.id) === categoryId);
 		return cat?.name ?? "No Category";
@@ -226,7 +226,7 @@
 								value={categoryId}
 								onValueChange={(v) => (categoryId = v ?? "")}
 							>
-								<SelectTrigger>{categoryLabel()}</SelectTrigger>
+								<SelectTrigger>{categoryLabel}</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="">No Category</SelectItem>
 									{#each categories as cat}

@@ -70,7 +70,7 @@
 		customerPopoverOpen = false;
 	}
 
-	const filteredCustomers = $derived(() => {
+	const filteredCustomers = $derived.by(() => {
 		if (!customerSearch.trim()) return customers;
 		const q = customerSearch.toLowerCase();
 		return customers.filter(
@@ -184,7 +184,7 @@
 									Clear selection
 								</CommandItem>
 							{/if}
-							{#each filteredCustomers() as customer (customer.id)}
+							{#each filteredCustomers as customer (customer.id)}
 								<CommandItem
 									value="{customer.first_name} {customer.last_name} {customer.email ?? ''}"
 									onSelect={() => selectCustomer(customer)}

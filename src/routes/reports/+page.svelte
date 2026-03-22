@@ -58,7 +58,7 @@
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
 	// Sales summary stats
-	const salesSummary = $derived(() => {
+	const salesSummary = $derived.by(() => {
 		const totalRevenue = salesData.reduce((s, r) => s + r.total_cents, 0);
 		const totalOrders = salesData.reduce((s, r) => s + r.order_count, 0);
 		const totalTax = salesData.reduce((s, r) => s + r.tax_cents, 0);
@@ -67,7 +67,7 @@
 	});
 
 	// Product summary stats
-	const productSummary = $derived(() => {
+	const productSummary = $derived.by(() => {
 		const totalRevenue = productData.reduce((s, p) => s + p.total_revenue_cents, 0);
 		const totalUnits = productData.reduce((s, p) => s + p.total_quantity, 0);
 		const uniqueProducts = productData.length;
@@ -75,7 +75,7 @@
 	});
 
 	// Inventory stats
-	const inventoryStats = $derived(() => {
+	const inventoryStats = $derived.by(() => {
 		const totalItems = inventoryData.length;
 		const totalStock = inventoryData.reduce((s, i) => s + i.stock_quantity, 0);
 		const lowStock = inventoryData.filter((i) => i.stock_quantity <= i.low_stock_threshold).length;
@@ -85,17 +85,17 @@
 	});
 
 	// Max value for bar chart scaling
-	const salesMaxCents = $derived(() => {
+	const salesMaxCents = $derived.by(() => {
 		if (salesData.length === 0) return 1;
 		return Math.max(...salesData.map((r) => r.total_cents));
 	});
 
-	const productMaxCents = $derived(() => {
+	const productMaxCents = $derived.by(() => {
 		if (productData.length === 0) return 1;
 		return Math.max(...productData.map((p) => p.total_revenue_cents));
 	});
 
-	const groupByLabel = $derived(() => {
+	const groupByLabel = $derived.by(() => {
 		switch (salesGroupBy) {
 			case "day": return "Daily";
 			case "week": return "Weekly";
@@ -206,7 +206,7 @@
 							<DollarSign class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{formatCurrency(salesSummary().totalRevenue, currencySymbol)}</div>
+							<div class="text-2xl font-bold">{formatCurrency(salesSummary.totalRevenue, currencySymbol)}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -215,7 +215,7 @@
 							<ShoppingCart class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{salesSummary().totalOrders}</div>
+							<div class="text-2xl font-bold">{salesSummary.totalOrders}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -224,7 +224,7 @@
 							<TrendingUp class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{formatCurrency(salesSummary().avgOrder, currencySymbol)}</div>
+							<div class="text-2xl font-bold">{formatCurrency(salesSummary.avgOrder, currencySymbol)}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -233,7 +233,7 @@
 							<DollarSign class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{formatCurrency(salesSummary().totalTax, currencySymbol)}</div>
+							<div class="text-2xl font-bold">{formatCurrency(salesSummary.totalTax, currencySymbol)}</div>
 						</CardContent>
 					</Card>
 				</div>
@@ -245,7 +245,7 @@
 						value={salesGroupBy}
 						onValueChange={(v) => { salesGroupBy = (v as GroupBy) ?? "day"; loadSales(); }}
 					>
-						<SelectTrigger class="w-32">{groupByLabel()}</SelectTrigger>
+						<SelectTrigger class="w-32">{groupByLabel}</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="day">Daily</SelectItem>
 							<SelectItem value="week">Weekly</SelectItem>
@@ -287,12 +287,12 @@
 					<Card>
 						<CardHeader>
 							<CardTitle>Sales Over Time</CardTitle>
-							<CardDescription>{groupByLabel()} revenue for the selected period</CardDescription>
+							<CardDescription>{groupByLabel} revenue for the selected period</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<div class="space-y-2">
 								{#each salesData as row}
-									{@const pct = (row.total_cents / salesMaxCents()) * 100}
+									{@const pct = (row.total_cents / salesMaxCents) * 100}
 									<div class="flex items-center gap-3">
 										<span class="w-20 shrink-0 text-right text-xs text-muted-foreground">
 											{formatPeriodLabel(row.period)}
@@ -358,7 +358,7 @@
 							<DollarSign class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{formatCurrency(productSummary().totalRevenue, currencySymbol)}</div>
+							<div class="text-2xl font-bold">{formatCurrency(productSummary.totalRevenue, currencySymbol)}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -367,7 +367,7 @@
 							<Package class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{productSummary().totalUnits}</div>
+							<div class="text-2xl font-bold">{productSummary.totalUnits}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -376,7 +376,7 @@
 							<BarChart3 class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{productSummary().uniqueProducts}</div>
+							<div class="text-2xl font-bold">{productSummary.uniqueProducts}</div>
 						</CardContent>
 					</Card>
 				</div>
@@ -423,7 +423,7 @@
 						<CardContent>
 							<div class="space-y-2">
 								{#each productData.slice(0, 10) as product}
-									{@const pct = (product.total_revenue_cents / productMaxCents()) * 100}
+									{@const pct = (product.total_revenue_cents / productMaxCents) * 100}
 									<div class="flex items-center gap-3">
 										<span class="w-32 shrink-0 truncate text-right text-xs text-muted-foreground" title={product.product_name}>
 											{product.product_name}
@@ -491,7 +491,7 @@
 							<Package class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{inventoryStats().totalItems}</div>
+							<div class="text-2xl font-bold">{inventoryStats.totalItems}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -500,7 +500,7 @@
 							<ShoppingCart class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{inventoryStats().totalStock}</div>
+							<div class="text-2xl font-bold">{inventoryStats.totalStock}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -509,7 +509,7 @@
 							<AlertTriangle class="h-4 w-4 text-amber-500" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold text-amber-600">{inventoryStats().lowStock}</div>
+							<div class="text-2xl font-bold text-amber-600">{inventoryStats.lowStock}</div>
 						</CardContent>
 					</Card>
 					<Card>
@@ -518,7 +518,7 @@
 							<DollarSign class="h-4 w-4 text-muted-foreground" />
 						</CardHeader>
 						<CardContent>
-							<div class="text-2xl font-bold">{formatCurrency(inventoryStats().totalValue, currencySymbol)}</div>
+							<div class="text-2xl font-bold">{formatCurrency(inventoryStats.totalValue, currencySymbol)}</div>
 							<p class="text-xs text-muted-foreground">At cost price</p>
 						</CardContent>
 					</Card>

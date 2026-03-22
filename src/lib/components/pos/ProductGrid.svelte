@@ -30,7 +30,7 @@
 		onProductClick
 	}: Props = $props();
 
-	const filteredProducts = $derived(() => {
+	const filteredProducts = $derived.by(() => {
 		let result = products;
 		if (searchQuery.trim()) {
 			const q = searchQuery.toLowerCase();
@@ -89,7 +89,7 @@
 		<div class="flex flex-1 items-center justify-center">
 			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
-	{:else if filteredProducts().length === 0}
+	{:else if filteredProducts.length === 0}
 		<div class="flex flex-1 flex-col items-center justify-center text-muted-foreground">
 			<Package class="mb-2 h-10 w-10 opacity-50" />
 			<p class="text-sm">No products found</p>
@@ -97,7 +97,7 @@
 	{:else}
 		<ScrollArea class="flex-1">
 			<div class="grid grid-cols-2 gap-3 pr-3 xl:grid-cols-3 2xl:grid-cols-4">
-				{#each filteredProducts() as product (product.id)}
+				{#each filteredProducts as product (product.id)}
 					<button
 						type="button"
 						class="flex flex-col rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50 active:bg-accent"
