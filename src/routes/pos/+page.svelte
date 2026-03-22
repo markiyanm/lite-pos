@@ -20,6 +20,7 @@
 	import { withTransaction } from "$lib/db/index.js";
 	import { printReceipt, type ReceiptData } from "$lib/commands/printing.js";
 	import { formatCurrency } from "$lib/utils.js";
+	import { log } from "$lib/utils/logger.js";
 	import { AlertTriangle } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { toast } from "svelte-sonner";
@@ -83,10 +84,11 @@
 		if (!session.user) return;
 
 		try {
-			const orderNumber = await getNextOrderNumber();
-
 			// Wrap all DB writes in a transaction to prevent partial writes
+			// and avoid wasting order numbers on failure
 			await withTransaction(async () => {
+				const orderNumber = await getNextOrderNumber();
+
 				const { lastInsertId: orderId } = await createOrder({
 					orderNumber,
 					userId: session.user!.id,
@@ -121,8 +123,10 @@
 
 			orderStore.clear();
 			toast.success("Draft saved");
-		} catch {
-			toast.error("Failed to save draft");
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err);
+			log.error("order", `Failed to save draft: ${message}`);
+			toast.error(`Failed to save draft: ${message}`);
 		}
 	}
 
@@ -296,12 +300,13 @@
 		if (!session.user) return;
 
 		try {
-			// Generate order number only when actually creating the order
-			// (not when opening the payment modal, to avoid wasting numbers on cancel)
-			const orderNumber = await getNextOrderNumber();
-
 			// Wrap all DB writes in a transaction to prevent partial writes
+			// and avoid wasting order numbers on failure
+			let orderNumber = "";
 			await withTransaction(async () => {
+				// Generate order number inside transaction so it's not wasted on failure
+				orderNumber = await getNextOrderNumber();
+
 				// Create order
 				const { lastInsertId: orderId } = await createOrder({
 					orderNumber,
@@ -396,8 +401,10 @@
 			}
 
 			await finalizeOrder();
-		} catch {
-			toast.error("Payment failed");
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err);
+			log.error("order", `Payment failed: ${message}`);
+			toast.error(`Payment failed: ${message}`);
 		}
 	}
 
