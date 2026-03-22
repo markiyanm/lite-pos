@@ -9,3 +9,7 @@ export async function decryptValue(encrypted: string): Promise<string> {
 	if (!encrypted) return "";
 	return invoke<string>("decrypt_value", { encrypted });
 }
+
+export async function hashPin(pin: string): Promise<string> {
+	return invoke<string>("hash_pin", { pin });
+}

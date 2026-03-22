@@ -74,6 +74,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             crypto::encrypt_value,
             crypto::decrypt_value,
+            crypto::hash_pin,
             sola::process_sola_transaction,
             sola::cancel_sola_transaction,
             sola::build_sola_request_info,

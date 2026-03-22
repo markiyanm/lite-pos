@@ -4,6 +4,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use rand::Rng;
+use sha2::{Sha256, Digest};
 
 // Static 32-byte encryption key (AES-256).
 // Compiled into the binary — not readable from the SQLite file on disk.
@@ -56,4 +57,13 @@ pub fn decrypt_value(encrypted: String) -> Result<String, String> {
         .map_err(|_| "Decryption failed".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn hash_pin(pin: String) -> String {
+    let salted = format!("vira-pin:{}", pin);
+    let mut hasher = Sha256::new();
+    hasher.update(salted.as_bytes());
+    let result = hasher.finalize();
+    hex::encode(result)
 }
