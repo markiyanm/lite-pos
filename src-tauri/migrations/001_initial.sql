@@ -1,7 +1,6 @@
--- Enable WAL mode, foreign keys, and busy timeout for connection pool
+-- Enable WAL mode and foreign keys
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA busy_timeout = 5000;
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
