@@ -1,33 +1,33 @@
 items:
 - slug: fix-deviceselector-select-valueonvaluechange-type-mismatch
   title: Fix DeviceSelector Select value/onValueChange type mismatch
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
   - sweep
   - card-present
   created_at: '2026-03-22T00:29:27Z'
-  updated_at: '2026-03-22T00:29:27Z'
+  updated_at: '2026-03-22T03:59:09Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-deviceselector-select-valueonvaluechange-type-mismatch.md
+  file: docs/work-items/reviewing/fix-deviceselector-select-valueonvaluechange-type-mismatch.md
 - slug: fix-paymentmodal-binddevices-on-non-bindable-deviceselector-prop
   title: Fix PaymentModal bind:devices on non-bindable DeviceSelector prop
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
   - sweep
   - card-present
   created_at: '2026-03-22T00:29:37Z'
-  updated_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T03:59:10Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-paymentmodal-binddevices-on-non-bindable-deviceselector-prop.md
+  file: docs/work-items/reviewing/fix-paymentmodal-binddevices-on-non-bindable-deviceselector-prop.md
 - slug: add-disabled-prop-to-settingtoggle-to-enforce-admin-only-settings
   title: Add disabled prop to SettingToggle to enforce admin-only settings
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
@@ -35,52 +35,52 @@ items:
   - permissions
   - admin
   created_at: '2026-03-22T00:29:37Z'
-  updated_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T03:59:11Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/add-disabled-prop-to-settingtoggle-to-enforce-admin-only-settings.md
+  file: docs/work-items/reviewing/add-disabled-prop-to-settingtoggle-to-enforce-admin-only-settings.md
 - slug: fix-order-number-consumed-on-payment-modal-cancel
   title: Fix order number consumed on payment modal cancel
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
   - sweep
   - orders
   created_at: '2026-03-22T00:29:37Z'
-  updated_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T03:59:11Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-order-number-consumed-on-payment-modal-cancel.md
+  file: docs/work-items/reviewing/fix-order-number-consumed-on-payment-modal-cancel.md
 - slug: fix-typeof-import-type-assertion-error-in-settings-page
   title: Fix typeof import type assertion error in settings page
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P2
   tags:
   - sweep
   - typescript
   created_at: '2026-03-22T00:29:51Z'
-  updated_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T03:59:12Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-typeof-import-type-assertion-error-in-settings-page.md
+  file: docs/work-items/reviewing/fix-typeof-import-type-assertion-error-in-settings-page.md
 - slug: remove-or-implement-printhtml-windows-stub-in-printingrs
   title: Remove or implement print_html Windows stub in printing.rs
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P2
   tags:
   - sweep
   - printing
   created_at: '2026-03-22T00:29:51Z'
-  updated_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T03:59:13Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/remove-or-implement-printhtml-windows-stub-in-printingrs.md
+  file: docs/work-items/reviewing/remove-or-implement-printhtml-windows-stub-in-printingrs.md
 - slug: fix-escpos-column-layout-for-non-ascii-characters
   title: Fix ESC/POS column layout for non-ASCII characters
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P2
   tags:
@@ -88,26 +88,26 @@ items:
   - printing
   - i18n
   created_at: '2026-03-22T00:29:51Z'
-  updated_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T03:59:13Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-escpos-column-layout-for-non-ascii-characters.md
+  file: docs/work-items/reviewing/fix-escpos-column-layout-for-non-ascii-characters.md
 - slug: replace-deprecated-sveltecomponent-in-deviceselector
   title: Replace deprecated svelte:component in DeviceSelector
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P2
   tags:
   - sweep
   - svelte5
   created_at: '2026-03-22T00:29:55Z'
-  updated_at: '2026-03-22T00:29:55Z'
+  updated_at: '2026-03-22T03:59:14Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/replace-deprecated-sveltecomponent-in-deviceselector.md
+  file: docs/work-items/reviewing/replace-deprecated-sveltecomponent-in-deviceselector.md
 - slug: wrap-order-creation-in-a-db-transaction-to-prevent-partial-writes
   title: Wrap order creation in a DB transaction to prevent partial writes
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P0
   tags:
@@ -115,13 +115,13 @@ items:
   - data-integrity
   - orders
   created_at: '2026-03-22T00:48:39Z'
-  updated_at: '2026-03-22T00:48:39Z'
+  updated_at: '2026-03-22T03:59:15Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/wrap-order-creation-in-a-db-transaction-to-prevent-partial-writes.md
+  file: docs/work-items/reviewing/wrap-order-creation-in-a-db-transaction-to-prevent-partial-writes.md
 - slug: add-admin-guard-on-routes-and-data-modifying-commands
   title: Add admin guard on routes and data-modifying commands
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
@@ -129,13 +129,13 @@ items:
   - security
   - permissions
   created_at: '2026-03-22T00:48:55Z'
-  updated_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T03:59:16Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/add-admin-guard-on-routes-and-data-modifying-commands.md
+  file: docs/work-items/reviewing/add-admin-guard-on-routes-and-data-modifying-commands.md
 - slug: hash-user-pins-instead-of-storing-plaintext
   title: Hash user PINs instead of storing plaintext
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
@@ -143,13 +143,13 @@ items:
   - security
   - auth
   created_at: '2026-03-22T00:48:55Z'
-  updated_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T03:59:16Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/hash-user-pins-instead-of-storing-plaintext.md
+  file: docs/work-items/reviewing/hash-user-pins-instead-of-storing-plaintext.md
 - slug: replace-hardcoded-aes-encryption-key-with-os-keychain
   title: Replace hardcoded AES encryption key with OS keychain
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
@@ -157,14 +157,14 @@ items:
   - security
   - crypto
   created_at: '2026-03-22T00:48:55Z'
-  updated_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T03:59:17Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/replace-hardcoded-aes-encryption-key-with-os-keychain.md
+  file: docs/work-items/reviewing/replace-hardcoded-aes-encryption-key-with-os-keychain.md
 - slug: fix-derived-reactivity-replace-derived-with-derivedby-across-codebase
   title: Fix derived reactivity - replace derived(() =>) with derived.by() across
     codebase
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P1
   tags:
@@ -172,13 +172,13 @@ items:
   - svelte5
   - performance
   created_at: '2026-03-22T00:48:55Z'
-  updated_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T03:59:18Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/fix-derived-reactivity-replace-derived-with-derivedby-across-codebase.md
+  file: docs/work-items/reviewing/fix-derived-reactivity-replace-derived-with-derivedby-across-codebase.md
 - slug: add-persistent-error-state-ui-for-failed-data-loading
   title: Add persistent error state UI for failed data loading
-  status: queued
+  status: done
   pipeline: frontend
   priority: P2
   tags:
@@ -186,26 +186,26 @@ items:
   - ux
   - error-handling
   created_at: '2026-03-22T00:49:05Z'
-  updated_at: '2026-03-22T00:49:05Z'
+  updated_at: '2026-03-22T03:58:34Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/add-persistent-error-state-ui-for-failed-data-loading.md
+  file: docs/work-items/defining/add-persistent-error-state-ui-for-failed-data-loading.md
 - slug: clean-up-stray-nul-file-and-add-to-gitignore
   title: Clean up stray nul file and add to gitignore
-  status: queued
+  status: done
   pipeline: bugfix
   priority: P2
   tags:
   - sweep
   - cleanup
   created_at: '2026-03-22T00:49:06Z'
-  updated_at: '2026-03-22T00:49:06Z'
+  updated_at: '2026-03-22T03:59:18Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/queued/clean-up-stray-nul-file-and-add-to-gitignore.md
+  file: docs/work-items/reviewing/clean-up-stray-nul-file-and-add-to-gitignore.md
 - slug: remove-dead-code-exports-from-commands-modules
   title: Remove dead code exports from commands modules
-  status: queued
+  status: done
   pipeline: refactor
   priority: P2
   tags:
@@ -218,7 +218,7 @@ items:
   file: docs/work-items/queued/remove-dead-code-exports-from-commands-modules.md
 - slug: customer-gateway-sync-with-sola-recurring-api
   title: Customer gateway sync with Sola recurring API
-  status: planning
+  status: shippable
   pipeline: fullstack
   priority: P1
   tags:
@@ -227,13 +227,13 @@ items:
   - customers
   - sola
   created_at: '2026-03-22T02:53:54Z'
-  updated_at: '2026-03-22T03:04:48Z'
+  updated_at: '2026-03-22T03:58:41Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/planning/customer-gateway-sync-with-sola-recurring-api.md
+  file: docs/work-items/reviewing/customer-gateway-sync-with-sola-recurring-api.md
 - slug: application-logging-system-with-admin-viewer
   title: Application logging system with admin viewer
-  status: planning
+  status: shippable
   pipeline: fullstack
   priority: P1
   tags:
@@ -242,13 +242,13 @@ items:
   - settings
   - debug
   created_at: '2026-03-22T02:53:59Z'
-  updated_at: '2026-03-22T03:04:48Z'
+  updated_at: '2026-03-22T03:58:36Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/planning/application-logging-system-with-admin-viewer.md
+  file: docs/work-items/reviewing/application-logging-system-with-admin-viewer.md
 - slug: card-not-present-payments-via-ifields-integration
   title: Card not present payments via iFields integration
-  status: planning
+  status: shippable
   pipeline: fullstack
   priority: P1
   tags:
@@ -258,13 +258,13 @@ items:
   - sola
   - pci
   created_at: '2026-03-22T02:54:06Z'
-  updated_at: '2026-03-22T03:04:48Z'
+  updated_at: '2026-03-22T03:58:38Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/planning/card-not-present-payments-via-ifields-integration.md
+  file: docs/work-items/reviewing/card-not-present-payments-via-ifields-integration.md
 - slug: card-on-file-tokenization-and-saved-payment-methods
   title: Card on file tokenization and saved payment methods
-  status: planning
+  status: shippable
   pipeline: fullstack
   priority: P1
   tags:
@@ -274,7 +274,38 @@ items:
   - sola
   - ifields
   created_at: '2026-03-22T02:54:13Z'
-  updated_at: '2026-03-22T03:04:48Z'
+  updated_at: '2026-03-22T03:58:42Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/planning/card-on-file-tokenization-and-saved-payment-methods.md
+  file: docs/work-items/reviewing/card-on-file-tokenization-and-saved-payment-methods.md
+- slug: fix-draft-save-button-failing-with-error-toast
+  title: Fix draft save button failing with error toast
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - bug
+  - orders
+  - draft
+  - github-issue-1
+  created_at: '2026-03-22T04:06:13Z'
+  updated_at: '2026-03-22T04:06:13Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-draft-save-button-failing-with-error-toast.md
+- slug: fix-cnp-payment-shows-success-then-failure-order-not-completed
+  title: Fix CNP payment shows success then failure, order not completed
+  status: queued
+  pipeline: bugfix
+  priority: P0
+  tags:
+  - bug
+  - payments
+  - cnp
+  - ifields
+  - github-issue-2
+  created_at: '2026-03-22T04:06:20Z'
+  updated_at: '2026-03-22T04:06:20Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-cnp-payment-shows-success-then-failure-order-not-completed.md
