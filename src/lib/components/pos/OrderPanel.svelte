@@ -37,9 +37,10 @@
 		onPay: () => void;
 		onSaveDraft: () => void;
 		onClear: () => void;
+		busy?: boolean;
 	}
 
-	let { currencySymbol, onPay, onSaveDraft, onClear }: Props = $props();
+	let { currencySymbol, onPay, onSaveDraft, onClear, busy = false }: Props = $props();
 
 	let customerPopoverOpen = $state(false);
 	let customers = $state<Customer[]>([]);
@@ -283,13 +284,13 @@
 
 		<!-- Action buttons -->
 		<div class="border-t px-4 py-3 space-y-2">
-			<Button class="w-full" size="lg" onclick={onPay}>
+			<Button class="w-full" size="lg" onclick={onPay} disabled={busy || orderStore.items.length === 0}>
 				Pay {formatCurrency(orderStore.totalCents, currencySymbol)}
 			</Button>
 			<div class="flex gap-2">
-				<Button variant="outline" class="flex-1" onclick={onSaveDraft}>
+				<Button variant="outline" class="flex-1" onclick={onSaveDraft} disabled={busy || orderStore.items.length === 0}>
 					<FileText class="mr-2 h-4 w-4" />
-					Save Draft
+					{busy ? "Saving..." : "Save Draft"}
 				</Button>
 				<Button variant="outline" class="flex-1" onclick={onClear}>
 					<X class="mr-2 h-4 w-4" />

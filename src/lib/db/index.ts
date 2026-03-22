@@ -69,8 +69,8 @@ export async function withTransaction<T>(callback: () => Promise<T>): Promise<T>
 		try {
 			await database.execute(`ROLLBACK TO SAVEPOINT ${name}`, []);
 			await database.execute(`RELEASE SAVEPOINT ${name}`, []);
-		} catch {
-			// Rollback failed — connection may be in a bad state, but don't mask the original error
+		} catch (rollbackErr) {
+			console.error(`[DB] Rollback of ${name} failed:`, rollbackErr);
 		}
 		throw err;
 	}

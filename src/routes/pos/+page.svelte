@@ -39,6 +39,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let paymentOpen = $state(false);
+	let savingDraft = $state(false);
+	let processingPayment = $state(false);
 
 	// Receipt preview state
 	let receiptPreviewOpen = $state(false);
@@ -82,7 +84,9 @@
 	async function handleSaveDraft() {
 		if (orderStore.items.length === 0) return;
 		if (!session.user) return;
+		if (savingDraft) return;
 
+		savingDraft = true;
 		try {
 			// Wrap all DB writes in a transaction to prevent partial writes
 			// and avoid wasting order numbers on failure
@@ -127,6 +131,8 @@
 			const message = err instanceof Error ? err.message : String(err);
 			log.error("order", `Failed to save draft: ${message}`);
 			toast.error(`Failed to save draft: ${message}`);
+		} finally {
+			savingDraft = false;
 		}
 	}
 
@@ -298,7 +304,9 @@
 
 	async function handlePaymentComplete(payments: PartialPayment[]) {
 		if (!session.user) return;
+		if (processingPayment) return;
 
+		processingPayment = true;
 		try {
 			// Wrap all DB writes in a transaction to prevent partial writes
 			// and avoid wasting order numbers on failure
@@ -406,6 +414,8 @@
 			log.error("order", `Order creation failed: ${message}`);
 			toast.error(`Order creation failed: ${message}`);
 			throw err;
+		} finally {
+			processingPayment = false;
 		}
 	}
 
@@ -459,6 +469,7 @@
 			onPay={handlePay}
 			onSaveDraft={handleSaveDraft}
 			onClear={handleClear}
+			busy={savingDraft || processingPayment}
 		/>
 	</div>
 	</div>
