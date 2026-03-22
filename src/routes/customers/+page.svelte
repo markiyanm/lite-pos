@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { Users, Plus, Search, Loader2, Pencil, Trash2, Mail, Phone } from "lucide-svelte";
+	import { Users, Plus, Search, Loader2, Pencil, Trash2, Mail, Phone, AlertTriangle } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -28,6 +28,7 @@
 
 	let customers = $state<Customer[]>([]);
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 	let searchQuery = $state("");
 	let deleteDialogOpen = $state(false);
 	let deletingCustomer = $state<Customer | null>(null);
@@ -49,10 +50,12 @@
 
 	async function loadCustomers() {
 		loading = true;
+		error = null;
 		try {
 			customers = await getCustomers();
 		} catch {
 			toast.error("Failed to load customers");
+			error = "Failed to load customers. Please check your connection and try again.";
 			customers = [];
 		} finally {
 			loading = false;
@@ -96,6 +99,16 @@
 			Add Customer
 		</Button>
 	</div>
+
+	{#if error}
+		<div class="mb-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadCustomers(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
 
 	<!-- Search -->
 	<div class="mb-4 flex items-center gap-3">

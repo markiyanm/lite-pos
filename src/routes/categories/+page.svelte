@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { Tags, Plus, Pencil, Trash2, Loader2, GripVertical } from "lucide-svelte";
+	import { Tags, Plus, Pencil, Trash2, Loader2, GripVertical, AlertTriangle } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
@@ -26,6 +26,7 @@
 
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 	let dialogOpen = $state(false);
 	let deleteDialogOpen = $state(false);
 	let saving = $state(false);
@@ -48,10 +49,12 @@
 
 	async function loadCategories() {
 		loading = true;
+		error = null;
 		try {
 			categories = await getCategories();
 		} catch {
 			toast.error("Failed to load categories");
+			error = "Failed to load categories. Please check your connection and try again.";
 			categories = [];
 		} finally {
 			loading = false;
@@ -142,6 +145,16 @@
 			Add Category
 		</Button>
 	</div>
+
+	{#if error}
+		<div class="mb-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadCategories(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="flex justify-center py-16">

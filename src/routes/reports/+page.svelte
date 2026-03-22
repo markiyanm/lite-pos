@@ -38,6 +38,7 @@
 	import { toast } from "svelte-sonner";
 
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 
 	// Sales tab state
 	let salesGroupBy = $state<GroupBy>("day");
@@ -103,8 +104,9 @@
 		}
 	});
 
-	onMount(async () => {
+	async function loadAllData() {
 		loading = true;
+		error = null;
 		try {
 			// Set default date range: last 30 days
 			const now = new Date();
@@ -116,10 +118,15 @@
 			productDateTo = salesDateTo;
 
 			await Promise.all([loadSales(), loadProducts(), loadInventory()]);
+		} catch {
+			toast.error("Failed to load reports");
+			error = "Failed to load report data. Please check your connection and try again.";
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	onMount(loadAllData);
 
 	async function loadSales() {
 		salesLoading = true;
@@ -183,6 +190,16 @@
 		<BarChart3 class="h-6 w-6" />
 		<h1 class="text-2xl font-semibold">Reports</h1>
 	</div>
+
+	{#if error}
+		<div class="mb-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadAllData(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="flex justify-center py-16">

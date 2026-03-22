@@ -35,11 +35,13 @@
 	import { getCategories } from "$lib/commands/categories.js";
 	import { formatCurrency } from "$lib/utils.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
+	import { toast } from "svelte-sonner";
 	import type { Product, Category } from "$lib/types/index.js";
 
 	let products = $state<Product[]>([]);
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 	let searchQuery = $state("");
 	let filterCategoryId = $state<string>("");
 	let showInactive = $state(false);
@@ -71,20 +73,25 @@
 		return result;
 	});
 
-	onMount(async () => {
+	async function loadData() {
 		loading = true;
+		error = null;
 		try {
 			[products, categories] = await Promise.all([
 				getProducts({ activeOnly: false }),
 				getCategories()
 			]);
 		} catch {
+			toast.error("Failed to load products");
+			error = "Failed to load products. Please check your connection and try again.";
 			products = [];
 			categories = [];
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	onMount(loadData);
 
 	async function reload() {
 		products = await getProducts({ activeOnly: false });
@@ -137,6 +144,16 @@
 			Add Product
 		</Button>
 	</div>
+
+	{#if error}
+		<div class="mb-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadData(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
 
 	<!-- Filters -->
 	<div class="mb-4 flex items-center gap-3">

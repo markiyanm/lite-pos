@@ -20,6 +20,8 @@
 	import { withTransaction } from "$lib/db/index.js";
 	import { printReceipt, type ReceiptData } from "$lib/commands/printing.js";
 	import { formatCurrency } from "$lib/utils.js";
+	import { AlertTriangle } from "lucide-svelte";
+	import { Button } from "$lib/components/ui/button/index.js";
 	import { toast } from "svelte-sonner";
 	import type {
 		Product,
@@ -34,6 +36,7 @@
 	let products = $state<Product[]>([]);
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 	let paymentOpen = $state(false);
 
 	// Receipt preview state
@@ -46,8 +49,9 @@
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
-	onMount(async () => {
+	async function loadData() {
 		loading = true;
+		error = null;
 		try {
 			[products, categories] = await Promise.all([
 				getProducts({ activeOnly: true }),
@@ -55,12 +59,15 @@
 			]);
 		} catch {
 			toast.error("Failed to load products");
+			error = "Failed to load products and categories. Please check your connection and try again.";
 			products = [];
 			categories = [];
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	onMount(loadData);
 
 	function handleProductClick(product: Product) {
 		orderStore.addItem(product);
@@ -411,7 +418,17 @@
 	}
 </script>
 
-<div class="flex h-full">
+<div class="flex h-full flex-col">
+	{#if error}
+		<div class="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadData(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
+	<div class="flex flex-1">
 	<!-- Product grid (left side) -->
 	<div class="flex-1 p-4">
 		<ProductGrid
@@ -435,6 +452,7 @@
 			onSaveDraft={handleSaveDraft}
 			onClear={handleClear}
 		/>
+	</div>
 	</div>
 </div>
 

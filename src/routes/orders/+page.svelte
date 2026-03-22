@@ -3,7 +3,7 @@
 	import { goto } from "$app/navigation";
 	import {
 		ClipboardList, Search, Loader2, DollarSign,
-		ShoppingCart, TrendingUp, Calendar
+		ShoppingCart, TrendingUp, Calendar, AlertTriangle
 	} from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
@@ -33,6 +33,7 @@
 	let orders = $state<Order[]>([]);
 	let customers = $state<Customer[]>([]);
 	let loading = $state(true);
+	let error = $state<string | null>(null);
 	let searchQuery = $state("");
 	let filterStatus = $state<string>("");
 	let filterDateFrom = $state("");
@@ -88,8 +89,9 @@
 		return filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
 	});
 
-	onMount(async () => {
+	async function loadData() {
 		loading = true;
+		error = null;
 		try {
 			[orders, customers] = await Promise.all([
 				getOrders(),
@@ -97,12 +99,15 @@
 			]);
 		} catch {
 			toast.error("Failed to load orders");
+			error = "Failed to load orders. Please check your connection and try again.";
 			orders = [];
 			customers = [];
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	onMount(loadData);
 
 	function customerName(customerId: number | null): string {
 		if (!customerId) return "—";
@@ -150,6 +155,16 @@
 			<Badge variant="secondary">{orders.length}</Badge>
 		</div>
 	</div>
+
+	{#if error}
+		<div class="mb-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+			<AlertTriangle class="h-5 w-5 shrink-0" />
+			<p class="text-sm">{error}</p>
+			<Button variant="outline" size="sm" class="ml-auto" onclick={() => { error = null; loadData(); }}>
+				Retry
+			</Button>
+		</div>
+	{/if}
 
 	<!-- Stats Cards -->
 	{#if !loading}
