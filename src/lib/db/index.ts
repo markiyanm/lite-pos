@@ -1,56 +1,41 @@
 import Database from "@tauri-apps/plugin-sql";
 
 let db: Database | null = null;
-let initialized = false;
 
 export async function getDb(): Promise<Database> {
 	if (!db) {
 		db = await Database.load("sqlite:lite-pos.db");
-	}
-	// Ensure busy_timeout and WAL mode are set on every connection we get.
-	// tauri-plugin-sql uses sqlx::SqlitePool which may hand us different connections,
-	// and PRAGMAs are per-connection. We run this once after load.
-	if (!initialized) {
-		initialized = true;
+		// Set WAL mode once (persists across connections in the same DB file)
 		try {
-			await db.execute("PRAGMA busy_timeout = 5000", []);
 			await db.execute("PRAGMA journal_mode = WAL", []);
 		} catch {
-			// Non-fatal — some PRAGMAs may fail during migrations
+			// Non-fatal
 		}
 	}
 	return db;
 }
 
+/**
+ * Ensure busy_timeout is set on the current pool connection before any operation.
+ * tauri-plugin-sql uses sqlx::SqlitePool — each call may get a different connection,
+ * and PRAGMAs are per-connection. We must set busy_timeout every time to guarantee
+ * the connection we're using will wait (up to 5s) for locks instead of failing immediately.
+ */
+async function ensureBusyTimeout(database: Database): Promise<void> {
+	await database.execute("PRAGMA busy_timeout = 5000", []);
+}
+
 export async function execute(query: string, bindValues?: unknown[]): Promise<{ rowsAffected: number; lastInsertId: number }> {
 	const database = await getDb();
-	try {
-		const result = await database.execute(query, bindValues);
-		return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
-	} catch (err: unknown) {
-		const msg = String(err);
-		if (msg.includes("database is locked") || msg.includes("517")) {
-			// Retry once after explicitly setting busy_timeout on this connection
-			await database.execute("PRAGMA busy_timeout = 5000", []);
-			const result = await database.execute(query, bindValues);
-			return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
-		}
-		throw err;
-	}
+	await ensureBusyTimeout(database);
+	const result = await database.execute(query, bindValues);
+	return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
 }
 
 export async function select<T>(query: string, bindValues?: unknown[]): Promise<T[]> {
 	const database = await getDb();
-	try {
-		return await database.select(query, bindValues);
-	} catch (err: unknown) {
-		const msg = String(err);
-		if (msg.includes("database is locked") || msg.includes("517")) {
-			await database.execute("PRAGMA busy_timeout = 5000", []);
-			return database.select(query, bindValues);
-		}
-		throw err;
-	}
+	await ensureBusyTimeout(database);
+	return database.select(query, bindValues);
 }
 
 /**
@@ -59,11 +44,16 @@ export async function select<T>(query: string, bindValues?: unknown[]): Promise<
  * because SQLite does not support nested BEGIN TRANSACTION, and the
  * tauri-plugin-sql connection may have implicit transactions active.
  * If the callback throws, the savepoint is rolled back and the error re-thrown.
+ *
+ * Note: busy_timeout is set before the SAVEPOINT starts. All operations inside
+ * the callback use execute/select which also set busy_timeout, so every pool
+ * connection involved in this transaction will wait for locks.
  */
 let _savepointCounter = 0;
 
 export async function withTransaction<T>(callback: () => Promise<T>): Promise<T> {
 	const database = await getDb();
+	await ensureBusyTimeout(database);
 	const name = `sp_${++_savepointCounter}`;
 	await database.execute(`SAVEPOINT ${name}`, []);
 	try {
