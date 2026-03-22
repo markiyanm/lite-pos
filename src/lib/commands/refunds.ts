@@ -1,12 +1,8 @@
 import { select, execute } from "$lib/db/index.js";
-import type { Refund, RefundItem } from "$lib/types/index.js";
+import type { Refund } from "$lib/types/index.js";
 
 export async function getRefundsByOrder(orderId: number): Promise<Refund[]> {
 	return select<Refund>("SELECT * FROM refunds WHERE order_id = ? ORDER BY created_at DESC", [orderId]);
-}
-
-export async function getRefundItems(refundId: number): Promise<RefundItem[]> {
-	return select<RefundItem>("SELECT * FROM refund_items WHERE refund_id = ?", [refundId]);
 }
 
 export async function createRefund(refund: {

@@ -79,7 +79,6 @@ pub fn run() {
             sola::cancel_sola_transaction,
             sola::build_sola_request_info,
             printing::get_system_printers,
-            printing::print_html,
             printing::print_receipt
         ])
         .setup(|app| {

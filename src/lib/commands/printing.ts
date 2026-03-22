@@ -44,7 +44,3 @@ export async function getSystemPrinters(): Promise<PrinterInfo[]> {
 export async function printReceipt(receipt: ReceiptData, printerName: string): Promise<void> {
 	return invoke<void>("print_receipt", { receipt, printerName });
 }
-
-export async function printHtml(html: string, printerName: string): Promise<void> {
-	return invoke<void>("print_html", { html, printerName });
-}

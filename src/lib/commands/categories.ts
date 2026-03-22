@@ -7,11 +7,6 @@ export async function getCategories(): Promise<Category[]> {
 	);
 }
 
-export async function getCategory(id: number): Promise<Category | null> {
-	const rows = await select<Category>("SELECT * FROM categories WHERE id = ? AND deleted_at IS NULL", [id]);
-	return rows[0] ?? null;
-}
-
 export async function createCategory(category: { name: string; description?: string; color?: string; icon?: string; sort_order?: number }): Promise<{ lastInsertId: number }> {
 	const uuid = crypto.randomUUID();
 	return execute(

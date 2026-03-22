@@ -100,8 +100,8 @@ fn escpos_dashes() -> Vec<u8> {
 
 /// Format a line with left and right text, padded with spaces
 fn escpos_two_col(left: &str, right: &str) -> Vec<u8> {
-    let left_len = left.len();
-    let right_len = right.len();
+    let left_len = left.chars().count();
+    let right_len = right.chars().count();
     let mut line = String::with_capacity(COLS);
     line.push_str(left);
     if left_len + right_len < COLS {
@@ -332,57 +332,6 @@ fn print_raw_unix(printer_name: &str, data: &[u8]) -> Result<(), String> {
 
     let output = Command::new("lp")
         .args(&["-d", printer_name, "-o", "raw", &temp_path.display().to_string()])
-        .output()
-        .map_err(|e| format!("Failed to execute lp: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Print failed: {}", stderr));
-    }
-
-    Ok(())
-}
-
-// Keep the old print_html command for backwards compatibility / non-thermal printers
-#[tauri::command]
-pub fn print_html(html: String, printer_name: String) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        print_html_windows(&html, &printer_name)
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        print_html_unix(&html, &printer_name)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        print_html_unix(&html, &printer_name)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn print_html_windows(_html: &str, _printer_name: &str) -> Result<(), String> {
-    Err("HTML printing not supported for thermal printers. Use ESC/POS mode.".into())
-}
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-fn print_html_unix(html: &str, printer_name: &str) -> Result<(), String> {
-    use std::io::Write;
-    use std::process::Command;
-
-    let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join("lite-pos-receipt.html");
-
-    let mut file = std::fs::File::create(&temp_path)
-        .map_err(|e| format!("Failed to create temp file: {}", e))?;
-    file.write_all(html.as_bytes())
-        .map_err(|e| format!("Failed to write temp file: {}", e))?;
-    drop(file);
-
-    let output = Command::new("lp")
-        .args(&["-d", printer_name, &temp_path.display().to_string()])
         .output()
         .map_err(|e| format!("Failed to execute lp: {}", e))?;
 
