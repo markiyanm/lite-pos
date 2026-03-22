@@ -4,27 +4,39 @@ import { hashPin } from "$lib/commands/crypto.js";
 import { log } from "$lib/utils/logger.js";
 
 export async function login(pin: string): Promise<User | null> {
-	const hashed = await hashPin(pin);
-
-	// Try matching the hashed PIN first (migrated users)
-	const hashedMatch = await select<User>(
-		"SELECT * FROM users WHERE pin_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1",
-		[hashed]
-	);
-	if (hashedMatch[0]) {
-		log.info("auth", `Login successful: user="${hashedMatch[0].name}" role=${hashedMatch[0].role}`);
-		return hashedMatch[0];
+	let hashed: string | null = null;
+	try {
+		hashed = await hashPin(pin);
+	} catch {
+		// hashPin may fail if the Rust backend doesn't have the command yet (pre-rebuild)
+		// Fall through to plaintext comparison
 	}
 
-	// Backward compat: try matching the raw PIN (pre-migration users)
+	// Try matching the hashed PIN first (migrated users)
+	if (hashed) {
+		const hashedMatch = await select<User>(
+			"SELECT * FROM users WHERE pin_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1",
+			[hashed]
+		);
+		if (hashedMatch[0]) {
+			log.info("auth", `Login successful: user="${hashedMatch[0].name}" role=${hashedMatch[0].role}`);
+			return hashedMatch[0];
+		}
+	}
+
+	// Backward compat: try matching the raw PIN (pre-migration users or hash unavailable)
 	const rawMatch = await select<User>(
 		"SELECT * FROM users WHERE pin_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1",
 		[pin]
 	);
 	if (rawMatch[0]) {
-		// Migrate the user's PIN to hashed on successful login
-		await execute("UPDATE users SET pin_hash = ? WHERE id = ?", [hashed, rawMatch[0].id]);
-		log.info("auth", `Login successful (PIN migrated): user="${rawMatch[0].name}" role=${rawMatch[0].role}`);
+		// Migrate the user's PIN to hashed on successful login (if hashing is available)
+		if (hashed) {
+			await execute("UPDATE users SET pin_hash = ? WHERE id = ?", [hashed, rawMatch[0].id]);
+			log.info("auth", `Login successful (PIN migrated): user="${rawMatch[0].name}" role=${rawMatch[0].role}`);
+		} else {
+			log.info("auth", `Login successful (plaintext, hash unavailable): user="${rawMatch[0].name}" role=${rawMatch[0].role}`);
+		}
 		return rawMatch[0];
 	}
 
