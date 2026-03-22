@@ -20,7 +20,7 @@ export async function getCustomer(id: number): Promise<Customer | null> {
 	return rows[0] ?? null;
 }
 
-export async function createCustomer(customer: Omit<Customer, "id" | "uuid" | "created_at" | "updated_at" | "deleted_at">): Promise<{ lastInsertId: number }> {
+export async function createCustomer(customer: Omit<Customer, "id" | "uuid" | "created_at" | "updated_at" | "deleted_at" | "gateway_customer_id" | "gateway_sync_status" | "gateway_synced_at" | "gateway_revision">): Promise<{ lastInsertId: number }> {
 	const uuid = crypto.randomUUID();
 	return execute(
 		`INSERT INTO customers (uuid, first_name, last_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_zip, notes)

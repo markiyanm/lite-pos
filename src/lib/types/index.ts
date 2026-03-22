@@ -67,10 +67,16 @@ export interface Customer {
 	shipping_state: string | null;
 	shipping_zip: string | null;
 	notes: string | null;
+	gateway_customer_id: string | null;
+	gateway_sync_status: GatewaySyncStatus;
+	gateway_synced_at: string | null;
+	gateway_revision: number | null;
 	created_at: string;
 	updated_at: string;
 	deleted_at: string | null;
 }
+
+export type GatewaySyncStatus = "unsynced" | "synced" | "pending" | "error" | "archived" | "orphaned";
 
 // ---- Orders ----
 export type OrderStatus = "draft" | "completed" | "refunded" | "void";

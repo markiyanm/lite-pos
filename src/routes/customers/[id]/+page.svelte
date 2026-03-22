@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
-	import { Users, ArrowLeft, Save, Loader2, ShoppingBag, CreditCard, Trash2, Star } from "lucide-svelte";
+	import { Users, ArrowLeft, Save, Loader2, ShoppingBag, CreditCard, Trash2, Star, Cloud, CloudUpload, CloudAlert, CloudOff } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
@@ -34,7 +34,7 @@
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { formatCurrency } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
-	import type { Order, CustomerPaymentToken } from "$lib/types/index.js";
+	import type { Order, CustomerPaymentToken, GatewaySyncStatus } from "$lib/types/index.js";
 
 	const paramId = $derived(page.params.id as string);
 	const isNew = $derived(paramId === "new");
@@ -64,9 +64,15 @@
 	let shippingState = $state("");
 	let shippingZip = $state("");
 	let notes = $state("");
+	let gatewaySyncStatus = $state<GatewaySyncStatus>("unsynced");
+	let gatewaySyncedAt = $state<string | null>(null);
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 	const cardOnFileEnabled = $derived(settingsStore.getBoolean("enable_card_on_file"));
+	const syncEnabled = $derived(
+		settingsStore.getBoolean("gateway_customer_sync_enabled") &&
+		!!settingsStore.get("sola_gateway_api_key")
+	);
 
 	const orderStats = $derived.by(() => {
 		const completed = orders.filter((o) => o.status === "completed");
@@ -98,6 +104,8 @@
 					shippingState = customer.shipping_state ?? "";
 					shippingZip = customer.shipping_zip ?? "";
 					notes = customer.notes ?? "";
+					gatewaySyncStatus = customer.gateway_sync_status ?? "unsynced";
+					gatewaySyncedAt = customer.gateway_synced_at ?? null;
 
 					// Load order history
 					orders = await getOrders({ customerId });
@@ -392,6 +400,42 @@
 						<Textarea bind:value={notes} placeholder="Internal notes about this customer..." rows={4} />
 					</CardContent>
 				</Card>
+
+				<!-- Gateway Sync Status (existing customers only, when sync enabled) -->
+				{#if !isNew && syncEnabled}
+					<Card>
+						<CardHeader>
+							<CardTitle>Gateway Sync</CardTitle>
+						</CardHeader>
+						<CardContent class="space-y-2">
+							<div class="flex items-center gap-2">
+								{#if gatewaySyncStatus === "synced"}
+									<Cloud class="h-4 w-4 text-emerald-500" />
+									<Badge variant="default" class="bg-emerald-500">Synced</Badge>
+								{:else if gatewaySyncStatus === "pending"}
+									<CloudUpload class="h-4 w-4 animate-pulse text-blue-500" />
+									<Badge variant="secondary">Pending</Badge>
+								{:else if gatewaySyncStatus === "error"}
+									<CloudAlert class="h-4 w-4 text-orange-500" />
+									<Badge variant="destructive">Sync Error</Badge>
+								{:else if gatewaySyncStatus === "archived"}
+									<CloudOff class="h-4 w-4 text-muted-foreground" />
+									<Badge variant="outline">Archived</Badge>
+								{:else if gatewaySyncStatus === "orphaned"}
+									<CloudOff class="h-4 w-4 text-muted-foreground" />
+									<Badge variant="outline">Orphaned</Badge>
+								{:else}
+									<Badge variant="secondary">Not yet synced</Badge>
+								{/if}
+							</div>
+							{#if gatewaySyncedAt}
+								<p class="text-xs text-muted-foreground">
+									Last synced: {formatDate(gatewaySyncedAt)}
+								</p>
+							{/if}
+						</CardContent>
+					</Card>
+				{/if}
 
 				<!-- Order summary (existing customers only) -->
 				{#if !isNew}

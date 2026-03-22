@@ -5,7 +5,7 @@ description: Integrate Cardknox iFields (v3.4 from CDN, not npm) for manual card
   in the payment modal. PCI-compliant iframe-based card number and CVV collection.
   Returns single-use token sent to Sola gateway for processing. Setting to enable/disable
   CNP. Replaces the current placeholder in PaymentModal. No 3DS for now.
-status: defining
+status: planning
 pipeline: fullstack
 priority: P1
 tags:
@@ -15,7 +15,7 @@ tags:
 - sola
 - pci
 created_at: '2026-03-22T02:54:06Z'
-updated_at: '2026-03-22T02:57:51Z'
+updated_at: '2026-03-22T03:04:48Z'
 rework_count: 0
 artifacts:
   research: []
@@ -31,7 +31,11 @@ status_history:
   exited: '2026-03-22T02:57:51Z'
 - status: defining
   entered: '2026-03-22T02:57:51Z'
+  exited: '2026-03-22T03:04:48Z'
+- status: planning
+  entered: '2026-03-22T03:04:48Z'
 ---
+
 
 
 ## Overview

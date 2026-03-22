@@ -218,7 +218,7 @@ items:
   file: docs/work-items/queued/remove-dead-code-exports-from-commands-modules.md
 - slug: customer-gateway-sync-with-sola-recurring-api
   title: Customer gateway sync with Sola recurring API
-  status: defining
+  status: planning
   pipeline: fullstack
   priority: P1
   tags:
@@ -227,13 +227,13 @@ items:
   - customers
   - sola
   created_at: '2026-03-22T02:53:54Z'
-  updated_at: '2026-03-22T02:57:51Z'
+  updated_at: '2026-03-22T03:04:48Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/defining/customer-gateway-sync-with-sola-recurring-api.md
+  file: docs/work-items/planning/customer-gateway-sync-with-sola-recurring-api.md
 - slug: application-logging-system-with-admin-viewer
   title: Application logging system with admin viewer
-  status: defining
+  status: planning
   pipeline: fullstack
   priority: P1
   tags:
@@ -242,13 +242,13 @@ items:
   - settings
   - debug
   created_at: '2026-03-22T02:53:59Z'
-  updated_at: '2026-03-22T02:57:51Z'
+  updated_at: '2026-03-22T03:04:48Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/defining/application-logging-system-with-admin-viewer.md
+  file: docs/work-items/planning/application-logging-system-with-admin-viewer.md
 - slug: card-not-present-payments-via-ifields-integration
   title: Card not present payments via iFields integration
-  status: defining
+  status: planning
   pipeline: fullstack
   priority: P1
   tags:
@@ -258,13 +258,13 @@ items:
   - sola
   - pci
   created_at: '2026-03-22T02:54:06Z'
-  updated_at: '2026-03-22T02:57:51Z'
+  updated_at: '2026-03-22T03:04:48Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/defining/card-not-present-payments-via-ifields-integration.md
+  file: docs/work-items/planning/card-not-present-payments-via-ifields-integration.md
 - slug: card-on-file-tokenization-and-saved-payment-methods
   title: Card on file tokenization and saved payment methods
-  status: defining
+  status: planning
   pipeline: fullstack
   priority: P1
   tags:
@@ -274,7 +274,7 @@ items:
   - sola
   - ifields
   created_at: '2026-03-22T02:54:13Z'
-  updated_at: '2026-03-22T02:57:51Z'
+  updated_at: '2026-03-22T03:04:48Z'
   dependencies: []
   blocked_by: []
-  file: docs/work-items/defining/card-on-file-tokenization-and-saved-payment-methods.md
+  file: docs/work-items/planning/card-on-file-tokenization-and-saved-payment-methods.md

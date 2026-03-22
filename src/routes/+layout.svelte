@@ -12,6 +12,12 @@
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import { untrack, onMount } from "svelte";
 	import { log } from "$lib/utils/logger.js";
+	import {
+		syncCustomersWithGateway,
+		acquireSyncLock,
+		releaseSyncLock,
+		getDecryptedApiKey
+	} from "$lib/commands/customer-sync.js";
 
 	let { children } = $props();
 
@@ -55,6 +61,62 @@
 		if (session.isAuthenticated && !session.isAdmin && isAdminRoute(page.url.pathname)) {
 			goto("/pos");
 			toast.error("Admin access required");
+		}
+	});
+
+	// Background customer sync
+	let syncIntervalId: ReturnType<typeof setInterval> | null = null;
+
+	async function runBackgroundSync() {
+		const syncEnabled = settingsStore.getBoolean("gateway_customer_sync_enabled");
+		const apiKeyConfigured = !!settingsStore.get("sola_gateway_api_key");
+
+		if (!syncEnabled || !apiKeyConfigured) return;
+
+		const locked = await acquireSyncLock();
+		if (!locked) return; // already running
+
+		try {
+			const apiKey = await getDecryptedApiKey();
+			if (!apiKey) {
+				await releaseSyncLock();
+				return;
+			}
+
+			const result = await syncCustomersWithGateway(apiKey);
+			if (result.errors > 0) {
+				toast.warning(`Customer sync completed with ${result.errors} errors`);
+			}
+		} catch {
+			// Silently fail for background sync
+		} finally {
+			try { await releaseSyncLock(); } catch {}
+		}
+	}
+
+	function startSyncSchedule() {
+		if (syncIntervalId) {
+			clearInterval(syncIntervalId);
+			syncIntervalId = null;
+		}
+
+		const intervalMinutes = settingsStore.getNumber("gateway_sync_interval_minutes") || 15;
+		const intervalMs = Math.max(5, intervalMinutes) * 60 * 1000;
+
+		syncIntervalId = setInterval(runBackgroundSync, intervalMs);
+	}
+
+	// Start background sync after settings load, with 5-second delay per FR-12
+	let hasSyncStarted = false;
+	$effect(() => {
+		if (settingsStore.loaded && session.isAuthenticated && !hasSyncStarted) {
+			hasSyncStarted = true;
+			untrack(() => {
+				setTimeout(() => {
+					runBackgroundSync();
+					startSyncSchedule();
+				}, 5000);
+			});
 		}
 	});
 

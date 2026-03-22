@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { Users, Plus, Search, Loader2, Pencil, Trash2, Mail, Phone, AlertTriangle } from "lucide-svelte";
+	import { Users, Plus, Search, Loader2, Pencil, Trash2, Mail, Phone, AlertTriangle, Cloud, CloudUpload, CloudAlert, CloudOff } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -24,7 +24,8 @@
 	} from "$lib/components/ui/dialog/index.js";
 	import { getCustomers, deleteCustomer } from "$lib/commands/customers.js";
 	import { toast } from "svelte-sonner";
-	import type { Customer } from "$lib/types/index.js";
+	import type { Customer, GatewaySyncStatus } from "$lib/types/index.js";
+	import { settingsStore } from "$lib/stores/settings.svelte.js";
 
 	let customers = $state<Customer[]>([]);
 	let loading = $state(true);
@@ -33,6 +34,11 @@
 	let deleteDialogOpen = $state(false);
 	let deletingCustomer = $state<Customer | null>(null);
 	let deleting = $state(false);
+
+	const syncEnabled = $derived(
+		settingsStore.getBoolean("gateway_customer_sync_enabled") &&
+		!!settingsStore.get("sola_gateway_api_key")
+	);
 
 	const filteredCustomers = $derived.by(() => {
 		if (!searchQuery.trim()) return customers;
@@ -147,6 +153,9 @@
 						<TableHead>Email</TableHead>
 						<TableHead>Phone</TableHead>
 						<TableHead>City</TableHead>
+						{#if syncEnabled}
+							<TableHead class="w-10 text-center">Sync</TableHead>
+						{/if}
 						<TableHead class="text-right">Actions</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -185,6 +194,19 @@
 							<TableCell>
 								{customer.billing_city ?? "—"}
 							</TableCell>
+							{#if syncEnabled}
+								<TableCell class="text-center">
+									{#if customer.gateway_sync_status === "synced"}
+										<Cloud class="inline-block h-4 w-4 text-emerald-500" />
+									{:else if customer.gateway_sync_status === "pending"}
+										<CloudUpload class="inline-block h-4 w-4 animate-pulse text-blue-500" />
+									{:else if customer.gateway_sync_status === "error"}
+										<CloudAlert class="inline-block h-4 w-4 text-orange-500" />
+									{:else if customer.gateway_sync_status === "archived" || customer.gateway_sync_status === "orphaned"}
+										<CloudOff class="inline-block h-4 w-4 text-muted-foreground" />
+									{/if}
+								</TableCell>
+							{/if}
 							<TableCell class="text-right">
 								<div class="flex justify-end gap-1">
 									<Button

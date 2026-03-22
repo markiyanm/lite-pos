@@ -4,6 +4,8 @@ mod crypto;
 mod logging;
 mod sola;
 mod printing;
+mod recurring_api;
+mod customer_sync;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -80,6 +82,12 @@ pub fn run() {
             sql: include_str!("../migrations/012_customer_payment_tokens.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "add customer gateway sync columns and sync_log table",
+            sql: include_str!("../migrations/013_customer_gateway_sync.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -106,7 +114,14 @@ pub fn run() {
             logging::get_log_entries,
             logging::get_log_dates,
             logging::export_log,
-            logging::purge_old_logs
+            logging::purge_old_logs,
+            customer_sync::gateway_sync_acquire_lock,
+            customer_sync::gateway_sync_release_lock,
+            customer_sync::gateway_sync_is_running,
+            customer_sync::gateway_list_customers,
+            customer_sync::gateway_create_customer,
+            customer_sync::gateway_update_customer,
+            customer_sync::gateway_delete_customer
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

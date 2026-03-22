@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Settings, Save, Loader2, Sun, Moon, Monitor, ImagePlus, X, Eye, EyeOff, CreditCard, Wifi, Pencil, Check, Trash2, Plus, Printer, FileText } from "lucide-svelte";
+	import { Settings, Save, Loader2, Sun, Moon, Monitor, ImagePlus, X, Eye, EyeOff, CreditCard, Wifi, Pencil, Check, Trash2, Plus, Printer, FileText, RefreshCw } from "lucide-svelte";
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from "$lib/components/ui/tabs/index.js";
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -24,6 +24,7 @@
 	import { updateSetting, getAllSettings } from "$lib/commands/settings.js";
 	import { encryptValue, decryptValue } from "$lib/commands/crypto.js";
 	import { getSystemPrinters, type PrinterInfo } from "$lib/commands/printing.js";
+	import { syncCustomersWithGateway, acquireSyncLock, releaseSyncLock, getDecryptedApiKey } from "$lib/commands/customer-sync.js";
 	import { session } from "$lib/stores/session.svelte.js";
 	import { mode, setMode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
@@ -150,6 +151,12 @@
 	let newDeviceMake = $state("pax");
 	let newDeviceName = $state("");
 	let addingDevice = $state(false);
+
+	// Customer Sync settings
+	let gatewaySyncEnabled = $state(settingsStore.getBoolean("gateway_customer_sync_enabled"));
+	let gatewaySyncInterval = $state(settingsStore.get("gateway_sync_interval_minutes") || "15");
+	let customerSyncing = $state(false);
+	let lastSyncResult = $state("");
 
 	let activeTab = $state("store");
 	let saving = $state(false);
@@ -554,7 +561,9 @@
 				updateSetting("paper_width_mm", paperWidthMm),
 				updateSetting("enable_logging", String(enableLogging)),
 				updateSetting("log_level", logLevel),
-				updateSetting("log_retention_days", logRetentionDays)
+				updateSetting("log_retention_days", logRetentionDays),
+				updateSetting("gateway_customer_sync_enabled", String(gatewaySyncEnabled)),
+				updateSetting("gateway_sync_interval_minutes", gatewaySyncInterval)
 				// Note: color_theme is auto-saved on change, not part of main save
 			]);
 
@@ -577,6 +586,46 @@
 		{ value: "check", label: "Check" },
 		{ value: "credit_card", label: "Credit Card" }
 	];
+
+	async function handleSyncNow() {
+		customerSyncing = true;
+		lastSyncResult = "";
+		try {
+			const locked = await acquireSyncLock();
+			if (!locked) {
+				lastSyncResult = "Sync already in progress.";
+				return;
+			}
+
+			const apiKey = await getDecryptedApiKey();
+			if (!apiKey) {
+				lastSyncResult = "API key not configured.";
+				await releaseSyncLock();
+				return;
+			}
+
+			const result = await syncCustomersWithGateway(apiKey);
+			await releaseSyncLock();
+
+			if (result.success) {
+				lastSyncResult = `Done: ${result.created} created, ${result.updated} updated, ${result.pulled} pulled${result.errors > 0 ? `, ${result.errors} errors` : ""}`;
+				if (result.errors > 0) {
+					toast.warning(`Customer sync completed with ${result.errors} errors`);
+				} else {
+					toast.success("Customer sync completed successfully");
+				}
+			} else {
+				lastSyncResult = result.errorMessage ?? "Sync failed";
+				toast.error(result.errorMessage ?? "Customer sync failed");
+			}
+		} catch {
+			lastSyncResult = "Sync failed unexpectedly";
+			toast.error("Customer sync failed");
+			try { await releaseSyncLock(); } catch {}
+		} finally {
+			customerSyncing = false;
+		}
+	}
 </script>
 
 <div class="p-6">
@@ -1166,6 +1215,65 @@
 					</AlertDialogContent>
 				</AlertDialog>
 			</div>
+
+			<!-- Customer Sync (only visible when API key is configured) -->
+			{#if solaApiKey.trim()}
+				<Card class="mt-6">
+					<CardHeader>
+						<div class="flex items-center gap-2">
+							<CardTitle>Customer Sync</CardTitle>
+						</div>
+						<CardDescription>Sync customer records with the Sola gateway for recurring billing.</CardDescription>
+					</CardHeader>
+					<CardContent class="space-y-4">
+						<SettingToggle
+							label="Auto-sync Customers"
+							description="Automatically sync customer records with the gateway in the background."
+							checked={gatewaySyncEnabled}
+							disabled={!session.isAdmin}
+							onchange={(v) => (gatewaySyncEnabled = v)}
+						/>
+
+						{#if gatewaySyncEnabled}
+							<div class="grid gap-2">
+								<Label>Sync Interval (minutes)</Label>
+								<Input
+									type="number"
+									min={5}
+									max={1440}
+									value={gatewaySyncInterval}
+									oninput={(e) => (gatewaySyncInterval = e.currentTarget.value)}
+									disabled={!session.isAdmin}
+									class="max-w-32"
+								/>
+								<p class="text-xs text-muted-foreground">How often to sync (5-1440 minutes)</p>
+							</div>
+						{/if}
+
+						<Separator />
+
+						<div class="flex items-center gap-3">
+							<Button
+								variant="outline"
+								onclick={handleSyncNow}
+								disabled={customerSyncing || !session.isAdmin}
+							>
+								{#if customerSyncing}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+									Syncing...
+								{:else}
+									Sync Now
+								{/if}
+							</Button>
+							{#if lastSyncResult}
+								<p class="text-sm text-muted-foreground">
+									{lastSyncResult}
+								</p>
+							{/if}
+						</div>
+					</CardContent>
+				</Card>
+			{/if}
 		</TabsContent>
 
 		<!-- Printing -->
