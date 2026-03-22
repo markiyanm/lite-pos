@@ -57,7 +57,7 @@
   },
   "plugins": {
     "sql": {
-      "preload": ["sqlite:lite-pos.db?mode=rwc&busy_timeout=5000"]
+      "preload": ["sqlite:lite-pos.db"]
     },
     "updater": {
       "endpoints": [

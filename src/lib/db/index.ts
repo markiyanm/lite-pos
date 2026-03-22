@@ -5,7 +5,7 @@ let initialized = false;
 
 export async function getDb(): Promise<Database> {
 	if (!db) {
-		db = await Database.load("sqlite:lite-pos.db?mode=rwc&busy_timeout=5000");
+		db = await Database.load("sqlite:lite-pos.db");
 	}
 	// Ensure busy_timeout and WAL mode are set on every connection we get.
 	// tauri-plugin-sql uses sqlx::SqlitePool which may hand us different connections,
