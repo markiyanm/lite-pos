@@ -24,6 +24,7 @@
 	} from "$lib/commands/sola.js";
 	import { getCustomerTokens, createPaymentToken } from "$lib/commands/payment-tokens.js";
 	import { loadIfields, isIfieldsLoaded, IFIELDS_IFRAME_URL } from "$lib/utils/ifields-loader.js";
+	import { log } from "$lib/utils/logger.js";
 	import DeviceSelector from "./DeviceSelector.svelte";
 	import TransactionResultDialog from "./TransactionResultDialog.svelte";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -43,7 +44,7 @@
 		totalCents: number;
 		currencySymbol: string;
 		customerId?: number | null;
-		onComplete: (payments: PartialPayment[]) => void;
+		onComplete: (payments: PartialPayment[]) => void | Promise<void>;
 		onCancel: () => void;
 	}
 
@@ -399,13 +400,20 @@
 					}
 				});
 
-				toast.success("Payment approved");
-
 				// Save card token if checkbox was checked
 				await maybeSaveCardToken(response);
 
+				// Log gateway approval before attempting order creation
+				log.info('payment', `Gateway approved: ref=${response.xRefnum} amount=${remainingCents} last4=${response.xMaskedCardNumber?.slice(-4) || 'unknown'}`);
+
 				if (remainingCents === 0) {
-					onComplete(partialPayments);
+					try {
+						await onComplete(partialPayments);
+					} catch (err) {
+						console.error("Order creation failed after gateway approval:", err);
+						toast.error(`Payment approved but order failed. Ref: ${response.xRefnum}`);
+						return;
+					}
 				} else {
 					amountInput = "";
 					selectedMethod = "cash";
@@ -559,11 +567,20 @@
 				// Save card token if checkbox was checked
 				await maybeSaveCardToken(response);
 
+				// Log gateway approval before attempting order creation
+				log.info('payment', `Gateway approved: ref=${response.xRefnum} amount=${amountCents} last4=${response.xMaskedCardNumber?.slice(-4) || 'unknown'}`);
+
 				// Check if fully paid
 				if (remainingCents === 0) {
 					// Close result dialog and complete order
 					transactionResultOpen = false;
-					onComplete(partialPayments);
+					try {
+						await onComplete(partialPayments);
+					} catch (err) {
+						console.error("Order creation failed after gateway approval:", err);
+						toast.error(`Payment approved but order failed. Ref: ${response.xRefnum}`);
+						return;
+					}
 				} else {
 					// Reset for next payment
 					amountInput = "";
@@ -631,7 +648,7 @@
 			});
 
 			// Complete the order with all payments
-			onComplete(partialPayments);
+			await onComplete(partialPayments);
 		} finally {
 			processing = false;
 		}
@@ -689,8 +706,17 @@
 					}
 				});
 
+				// Log gateway approval before attempting order creation
+				log.info('payment', `Gateway approved (token): ref=${response.xRefnum} amount=${remainingCents} last4=${selectedSavedCard.card_last_four}`);
+
 				if (remainingCents === 0) {
-					onComplete(partialPayments);
+					try {
+						await onComplete(partialPayments);
+					} catch (err) {
+						console.error("Order creation failed after gateway approval:", err);
+						toast.error(`Payment approved but order failed. Ref: ${response.xRefnum}`);
+						return;
+					}
 				} else {
 					amountInput = "";
 					selectedMethod = "cash";

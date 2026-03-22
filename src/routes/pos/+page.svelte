@@ -403,8 +403,9 @@
 			await finalizeOrder();
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err);
-			log.error("order", `Payment failed: ${message}`);
-			toast.error(`Payment failed: ${message}`);
+			log.error("order", `Order creation failed: ${message}`);
+			toast.error(`Order creation failed: ${message}`);
+			throw err;
 		}
 	}
 
