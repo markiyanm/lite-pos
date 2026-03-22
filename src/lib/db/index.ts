@@ -5,26 +5,45 @@ let db: Database | null = null;
 export async function getDb(): Promise<Database> {
 	if (!db) {
 		db = await Database.load("sqlite:lite-pos.db");
-		// WAL mode allows concurrent readers during writes. Set per-connection
-		// since PRAGMA in migrations may not persist across connections.
-		await db.execute("PRAGMA journal_mode = WAL", []);
-		// Busy timeout: wait up to 5s for a lock instead of failing immediately
-		// with SQLITE_BUSY. Needed because background sync and logging write
-		// concurrently with user operations.
-		await db.execute("PRAGMA busy_timeout = 5000", []);
 	}
 	return db;
 }
 
+/**
+ * Execute a SQL statement, automatically setting busy_timeout on SQLITE_BUSY retry.
+ * The tauri-plugin-sql uses sqlx::SqlitePool with multiple connections, and PRAGMAs
+ * are per-connection, so we catch SQLITE_BUSY and retry after setting busy_timeout
+ * on the current connection.
+ */
 export async function execute(query: string, bindValues?: unknown[]): Promise<{ rowsAffected: number; lastInsertId: number }> {
 	const database = await getDb();
-	const result = await database.execute(query, bindValues);
-	return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
+	try {
+		const result = await database.execute(query, bindValues);
+		return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
+	} catch (err: unknown) {
+		const msg = String(err);
+		if (msg.includes("database is locked") || msg.includes("517")) {
+			// Set busy_timeout on this connection and retry once
+			await database.execute("PRAGMA busy_timeout = 5000", []);
+			const result = await database.execute(query, bindValues);
+			return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
+		}
+		throw err;
+	}
 }
 
 export async function select<T>(query: string, bindValues?: unknown[]): Promise<T[]> {
 	const database = await getDb();
-	return database.select(query, bindValues);
+	try {
+		return await database.select(query, bindValues);
+	} catch (err: unknown) {
+		const msg = String(err);
+		if (msg.includes("database is locked") || msg.includes("517")) {
+			await database.execute("PRAGMA busy_timeout = 5000", []);
+			return database.select(query, bindValues);
+		}
+		throw err;
+	}
 }
 
 /**
@@ -38,6 +57,8 @@ let _savepointCounter = 0;
 
 export async function withTransaction<T>(callback: () => Promise<T>): Promise<T> {
 	const database = await getDb();
+	// Set busy_timeout before starting the savepoint to ensure this connection waits
+	await database.execute("PRAGMA busy_timeout = 5000", []);
 	const name = `sp_${++_savepointCounter}`;
 	await database.execute(`SAVEPOINT ${name}`, []);
 	try {
