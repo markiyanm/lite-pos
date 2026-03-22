@@ -5,6 +5,13 @@ let db: Database | null = null;
 export async function getDb(): Promise<Database> {
 	if (!db) {
 		db = await Database.load("sqlite:lite-pos.db");
+		// WAL mode allows concurrent readers during writes. Set per-connection
+		// since PRAGMA in migrations may not persist across connections.
+		await db.execute("PRAGMA journal_mode = WAL", []);
+		// Busy timeout: wait up to 5s for a lock instead of failing immediately
+		// with SQLITE_BUSY. Needed because background sync and logging write
+		// concurrently with user operations.
+		await db.execute("PRAGMA busy_timeout = 5000", []);
 	}
 	return db;
 }
