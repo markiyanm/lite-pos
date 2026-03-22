@@ -6,6 +6,7 @@
 	import UpdateChecker from "$lib/components/app/UpdateChecker.svelte";
 	import { Toaster } from "$lib/components/ui/sonner/index.js";
 	import { ModeWatcher } from "mode-watcher";
+	import { toast } from "svelte-sonner";
 	import { session } from "$lib/stores/session.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
@@ -14,6 +15,16 @@
 	let { children } = $props();
 
 	const isLoginPage = $derived(page.url.pathname === "/login");
+
+	// Routes that require admin role
+	const adminOnlyPrefixes = ["/settings", "/categories", "/reports"];
+
+	function isAdminRoute(pathname: string): boolean {
+		if (adminOnlyPrefixes.some((p) => pathname.startsWith(p))) return true;
+		// /products/new and /products/[id] edit pages, but NOT the /products list
+		if (pathname.startsWith("/products/")) return true;
+		return false;
+	}
 
 	// Load theme once when settings are loaded (use untrack to prevent reactive loops)
 	let hasLoadedTheme = false;
@@ -30,6 +41,14 @@
 	$effect(() => {
 		if (!isLoginPage && !session.isAuthenticated) {
 			goto("/login");
+		}
+	});
+
+	// Admin guard: redirect non-admin users away from admin-only routes
+	$effect(() => {
+		if (session.isAuthenticated && !session.isAdmin && isAdminRoute(page.url.pathname)) {
+			goto("/pos");
+			toast.error("Admin access required");
 		}
 	});
 
