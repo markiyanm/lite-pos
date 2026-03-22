@@ -21,18 +21,29 @@ export async function select<T>(query: string, bindValues?: unknown[]): Promise<
 }
 
 /**
- * Execute a callback inside a SQLite transaction (BEGIN / COMMIT / ROLLBACK).
- * If the callback throws, the transaction is rolled back and the error re-thrown.
+ * Execute a callback inside a SQLite savepoint (nestable transaction).
+ * Uses SAVEPOINT/RELEASE/ROLLBACK TO instead of BEGIN/COMMIT/ROLLBACK
+ * because SQLite does not support nested BEGIN TRANSACTION, and the
+ * tauri-plugin-sql connection may have implicit transactions active.
+ * If the callback throws, the savepoint is rolled back and the error re-thrown.
  */
+let _savepointCounter = 0;
+
 export async function withTransaction<T>(callback: () => Promise<T>): Promise<T> {
 	const database = await getDb();
-	await database.execute("BEGIN TRANSACTION", []);
+	const name = `sp_${++_savepointCounter}`;
+	await database.execute(`SAVEPOINT ${name}`, []);
 	try {
 		const result = await callback();
-		await database.execute("COMMIT", []);
+		await database.execute(`RELEASE SAVEPOINT ${name}`, []);
 		return result;
 	} catch (err) {
-		await database.execute("ROLLBACK", []);
+		try {
+			await database.execute(`ROLLBACK TO SAVEPOINT ${name}`, []);
+			await database.execute(`RELEASE SAVEPOINT ${name}`, []);
+		} catch {
+			// Rollback failed — connection may be in a bad state, but don't mask the original error
+		}
 		throw err;
 	}
 }
