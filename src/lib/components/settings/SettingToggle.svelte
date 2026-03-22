@@ -7,12 +7,13 @@
 		description?: string;
 		checked: boolean;
 		onchange: (value: boolean) => void;
+		disabled?: boolean;
 	}
 
-	let { label, description, checked, onchange }: Props = $props();
+	let { label, description, checked, onchange, disabled = false }: Props = $props();
 </script>
 
-<div class="flex items-center justify-between gap-4 rounded-lg border p-4">
+<div class="flex items-center justify-between gap-4 rounded-lg border p-4" class:opacity-50={disabled}>
 	<div class="space-y-0.5">
 		<Label>{label}</Label>
 		{#if description}
@@ -21,6 +22,7 @@
 	</div>
 	<Switch
 		{checked}
+		{disabled}
 		onCheckedChange={onchange}
 	/>
 </div>
