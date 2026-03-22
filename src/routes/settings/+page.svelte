@@ -56,7 +56,7 @@
 	let receiptShowStoreInfo = $state(settingsStore.getBoolean("receipt_show_store_info"));
 
 	// Printer settings
-	let printerEnabled = $state(settingsStore.getBoolean("printer_enabled"));
+	let receiptMode = $state(settingsStore.get("receipt_mode") || "off");
 	let printerName = $state(settingsStore.get("printer_name"));
 	let printerType = $state(settingsStore.get("printer_type"));
 	let paperWidthMm = $state(settingsStore.get("paper_width_mm"));
@@ -131,6 +131,7 @@
 	let newDeviceName = $state("");
 	let addingDevice = $state(false);
 
+	let activeTab = $state("store");
 	let saving = $state(false);
 	let saveMessage = $state("");
 
@@ -246,9 +247,9 @@
 		return String(Math.round(val * 100));
 	}
 
-	// Auto-load printers when printing is enabled
+	// Auto-load printers only when the Printing tab is active and printing is enabled
 	$effect(() => {
-		if (printerEnabled && availablePrinters.length <= 1 && !printersLoading) {
+		if (activeTab === "printing" && receiptMode !== "off" && availablePrinters.length <= 1 && !printersLoading) {
 			loadPrinters();
 		}
 	});
@@ -483,12 +484,6 @@
 
 			availablePrinters = printers;
 			console.log("[Settings] availablePrinters after assignment:", availablePrinters);
-
-			if (printers.length > 0) {
-				toast.success(`Found ${printers.length} printer(s)`);
-			} else {
-				toast.info("No printers found");
-			}
 		} catch (err) {
 			console.error("Failed to load printers:", err);
 			toast.error(`Failed to load printers: ${err instanceof Error ? err.message : String(err)}`);
@@ -530,7 +525,7 @@
 				updateSetting("sola_gateway_card_not_present", String(solaCardNotPresent)),
 				updateSetting("sola_gateway_api_key", encryptedApiKey),
 				updateSetting("sola_gateway_default_device_id", solaDefaultDeviceId),
-				updateSetting("printer_enabled", String(printerEnabled)),
+				updateSetting("receipt_mode", receiptMode),
 				updateSetting("printer_name", printerName),
 				updateSetting("printer_type", printerType),
 				updateSetting("paper_width_mm", paperWidthMm)
@@ -579,7 +574,7 @@
 		</div>
 	</div>
 
-	<Tabs value="store" class="w-full">
+	<Tabs bind:value={activeTab} class="w-full">
 		<TabsList class="mb-4">
 			<TabsTrigger value="store">Store Info</TabsTrigger>
 			<TabsTrigger value="tax">Tax</TabsTrigger>
@@ -1096,113 +1091,49 @@
 
 		<!-- Printing -->
 		<TabsContent value="printing">
-			<!-- Printer Setup -->
+			<!-- Receipt Settings -->
 			<Card class="mb-4">
 				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Printer class="h-5 w-5" />
-						Printer Setup
-					</CardTitle>
-					<CardDescription>Configure your receipt printer settings.</CardDescription>
-				</CardHeader>
-				<CardContent class="space-y-4">
-					<SettingToggle
-						label="Enable Printing"
-						description="Enable automatic receipt printing after orders."
-						checked={printerEnabled}
-						onchange={(v) => (printerEnabled = v)}
-					/>
-
-					{#if printerEnabled}
-						<div class="space-y-4">
-							<!-- Printer Selection -->
-							<div class="space-y-2">
-								<Label for="printer-name">Select Printer</Label>
-								<div class="flex gap-2">
-									<select
-										id="printer-name"
-										bind:value={printerName}
-										class="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-									>
-										<option value="">Select printer...</option>
-										{#each availablePrinters as printer, i (i)}
-											<option value={printer.name}>
-												{printer.name}{#if printer.is_default} (Default){/if}
-											</option>
-										{/each}
-									</select>
-									<Button
-										variant="outline"
-										onclick={loadPrinters}
-										disabled={printersLoading}
-									>
-										{#if printersLoading}
-											<Loader2 class="h-4 w-4 animate-spin" />
-										{:else}
-											Refresh
-										{/if}
-									</Button>
-								</div>
-								<p class="text-xs text-muted-foreground">
-									Select your receipt printer from the list of installed printers.
-								</p>
-							</div>
-
-							<!-- Printer Type -->
-							<div class="space-y-2">
-								<Label for="printer-type">Printer Type</Label>
-								<select
-									id="printer-type"
-									bind:value={printerType}
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="standard">Standard Printer</option>
-									<option value="thermal">Thermal Receipt Printer (Epson, Star)</option>
-								</select>
-								<p class="text-xs text-muted-foreground">
-									Choose "Thermal" for dedicated receipt printers like Epson TM-T20 or Star TSP100.
-								</p>
-							</div>
-
-							<!-- Paper Width -->
-							<div class="space-y-2">
-								<Label for="paper-width">Paper Width (mm)</Label>
-								<select
-									id="paper-width"
-									bind:value={paperWidthMm}
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="58">58mm (2 inch)</option>
-									<option value="80">80mm (3 inch)</option>
-								</select>
-								<p class="text-xs text-muted-foreground">
-									Standard thermal receipt printers use 80mm paper.
-								</p>
-							</div>
-
-							<!-- Test Print Button -->
-							<div class="pt-2">
-								<Button
-									variant="outline"
-									onclick={() => (testPrintOpen = true)}
-									disabled={!printerName}
-								>
-									<Printer class="h-4 w-4 mr-2" />
-									Test Print
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</CardContent>
-			</Card>
-
-			<!-- Receipt Settings -->
-			<Card>
-				<CardHeader>
 					<CardTitle>Receipt Settings</CardTitle>
-					<CardDescription>Customize what appears on printed receipts.</CardDescription>
+					<CardDescription>Configure receipt printing behavior and content.</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4">
+					<!-- Receipt Mode: three-way selector -->
+					<div class="space-y-2">
+						<Label>Receipt Printing</Label>
+						<div class="grid grid-cols-3 gap-2">
+							<button
+								type="button"
+								class="flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 transition-colors {receiptMode === 'off' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+								onclick={() => (receiptMode = "off")}
+							>
+								<span class="text-sm font-medium">Off</span>
+								<span class="text-xs text-muted-foreground text-center">No receipts printed</span>
+							</button>
+							<button
+								type="button"
+								class="flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 transition-colors {receiptMode === 'prompt' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+								onclick={() => (receiptMode = "prompt")}
+							>
+								<span class="text-sm font-medium">Preview First</span>
+								<span class="text-xs text-muted-foreground text-center">Show receipt before printing</span>
+							</button>
+							<button
+								type="button"
+								class="flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 transition-colors {receiptMode === 'auto' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'}"
+								onclick={() => (receiptMode = "auto")}
+							>
+								<span class="text-sm font-medium">Automatic</span>
+								<span class="text-xs text-muted-foreground text-center">Print after every sale</span>
+							</button>
+						</div>
+						<p class="text-xs text-muted-foreground">
+							Choose how receipts are handled after completing a sale.
+						</p>
+					</div>
+
+					<Separator />
+
 					<SettingToggle
 						label="Show Store Info"
 						description="Display store name, address, and contact info on receipts."
@@ -1227,6 +1158,97 @@
 					/>
 				</CardContent>
 			</Card>
+
+			<!-- Printer Hardware (only shown when printing is enabled) -->
+			{#if receiptMode !== "off"}
+				<Card>
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Printer class="h-5 w-5" />
+							Printer Hardware
+						</CardTitle>
+						<CardDescription>Select and configure your receipt printer.</CardDescription>
+					</CardHeader>
+					<CardContent class="space-y-4">
+						<!-- Printer Selection -->
+						<div class="space-y-2">
+							<Label for="printer-name">Select Printer</Label>
+							<div class="flex gap-2">
+								<select
+									id="printer-name"
+									bind:value={printerName}
+									class="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+								>
+									<option value="">Select printer...</option>
+									{#each availablePrinters as printer, i (i)}
+										<option value={printer.name}>
+											{printer.name}{#if printer.is_default} (Default){/if}
+										</option>
+									{/each}
+								</select>
+								<Button
+									variant="outline"
+									onclick={loadPrinters}
+									disabled={printersLoading}
+								>
+									{#if printersLoading}
+										<Loader2 class="h-4 w-4 animate-spin" />
+									{:else}
+										Refresh
+									{/if}
+								</Button>
+							</div>
+							<p class="text-xs text-muted-foreground">
+								Select your receipt printer from the list of installed printers.
+							</p>
+						</div>
+
+						<!-- Printer Type -->
+						<div class="space-y-2">
+							<Label for="printer-type">Printer Type</Label>
+							<select
+								id="printer-type"
+								bind:value={printerType}
+								class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							>
+								<option value="standard">Standard Printer</option>
+								<option value="thermal">Thermal Receipt Printer (Epson, Star)</option>
+							</select>
+							<p class="text-xs text-muted-foreground">
+								Choose "Thermal" for dedicated receipt printers like Epson TM-T20 or Star TSP100.
+							</p>
+						</div>
+
+						<!-- Paper Width -->
+						<div class="space-y-2">
+							<Label for="paper-width">Paper Width (mm)</Label>
+							<select
+								id="paper-width"
+								bind:value={paperWidthMm}
+								class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							>
+								<option value="58">58mm (2 inch)</option>
+								<option value="80">80mm (3 inch)</option>
+							</select>
+							<p class="text-xs text-muted-foreground">
+								Standard thermal receipt printers use 80mm paper.
+							</p>
+						</div>
+
+						<!-- Test Print Button -->
+						<div class="pt-2">
+							<Button
+								variant="outline"
+								onclick={() => (testPrintOpen = true)}
+								disabled={!printerName}
+							>
+								<Printer class="h-4 w-4 mr-2" />
+								Test Print
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+			{/if}
 		</TabsContent>
 
 		<!-- Inventory -->
@@ -1422,5 +1444,6 @@
 	taxLabel="Tax"
 	currencySymbol={currencySymbol}
 	printerType={printerType as "standard" | "thermal"}
+	{printerName}
 	onClose={() => (testPrintOpen = false)}
 />

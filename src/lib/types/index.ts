@@ -211,6 +211,27 @@ export interface SolaTransactionResponse {
 	xEntryMethod?: string;
 }
 
+export interface SolaRequestInfo {
+	url: string;
+	command: string;
+	amount: string;
+	device_id: string;
+	invoice: string | null;
+	request_id: string;
+	masked_key: string;
+	software_name: string;
+	software_version: string;
+	timestamp: string;
+}
+
+export interface SolaTransactionResult {
+	request_info: SolaRequestInfo;
+	response: SolaTransactionResponse;
+	raw_response: string;
+	http_status: number;
+	duration_ms: number;
+}
+
 export interface PartialPayment {
 	method: PaymentMethod;
 	amountCents: number;

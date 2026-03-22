@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolaTransactionRequest {
     #[serde(rename = "xKey")]
@@ -21,7 +22,7 @@ pub struct SolaTransactionRequest {
     pub x_invoice: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolaTransactionResponse {
     #[serde(rename = "xRefnum")]
@@ -52,50 +53,152 @@ pub struct SolaTransactionResponse {
     pub x_entry_method: Option<String>,
 }
 
+/// Serializable request info for frontend debugging display (API key masked)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SolaRequestInfo {
+    pub url: String,
+    pub command: String,
+    pub amount: String,
+    pub device_id: String,
+    pub invoice: Option<String>,
+    pub request_id: String,
+    pub masked_key: String,
+    pub software_name: String,
+    pub software_version: String,
+    pub timestamp: String,
+}
+
+/// Combined result returned from transaction commands
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SolaTransactionResult {
+    pub request_info: SolaRequestInfo,
+    pub response: SolaTransactionResponse,
+    pub raw_response: String,
+    pub http_status: u16,
+    pub duration_ms: u64,
+}
+
+fn build_request_info(
+    api_key: &str,
+    command: &str,
+    amount: &str,
+    device_id: &str,
+    invoice: &Option<String>,
+    request_id: &str,
+) -> SolaRequestInfo {
+    let masked_key = if api_key.len() > 10 {
+        format!("{}...{}", &api_key[..5], &api_key[api_key.len() - 5..])
+    } else {
+        "***".to_string()
+    };
+
+    SolaRequestInfo {
+        url: "https://device.cardknox.com/v2/session".to_string(),
+        command: command.to_string(),
+        amount: amount.to_string(),
+        device_id: device_id.to_string(),
+        invoice: invoice.clone(),
+        request_id: request_id.to_string(),
+        masked_key,
+        software_name: "MM Lite POS".to_string(),
+        software_version: env!("CARGO_PKG_VERSION").to_string(),
+        timestamp: {
+            let duration = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default();
+            let secs = duration.as_secs();
+            let millis = duration.subsec_millis();
+            format!("{}.{:03}", secs, millis)
+        },
+    }
+}
+
+/// Build the request info and return it for the frontend to display immediately.
+/// This is called BEFORE the actual HTTP request.
+#[tauri::command]
+pub fn build_sola_request_info(
+    api_key: String,
+    device_id: String,
+    amount_cents: i64,
+    invoice_number: Option<String>,
+    command: Option<String>,
+) -> Result<SolaRequestInfo, String> {
+    let amount_dollars = format!("{:.2}", amount_cents as f64 / 100.0);
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let cmd = command.unwrap_or_else(|| "cc:sale".to_string());
+
+    Ok(build_request_info(
+        &api_key,
+        &cmd,
+        &amount_dollars,
+        &device_id,
+        &invoice_number,
+        &request_id,
+    ))
+}
+
 #[tauri::command]
 pub async fn process_sola_transaction(
     api_key: String,
     device_id: String,
     amount_cents: i64,
     invoice_number: Option<String>,
-) -> Result<SolaTransactionResponse, String> {
-    // Convert cents to dollars with 2 decimal places
-    let amount_dollars = format!("{:.2}", amount_cents as f64 / 100.0);
+) -> Result<SolaTransactionResult, String> {
+    execute_sola_command(&api_key, &device_id, amount_cents, &invoice_number, "cc:sale").await
+}
 
-    // Generate unique request ID
+#[tauri::command]
+pub async fn cancel_sola_transaction(
+    api_key: String,
+    device_id: String,
+) -> Result<SolaTransactionResult, String> {
+    execute_sola_command(&api_key, &device_id, 0, &None, "cc:cancel").await
+}
+
+async fn execute_sola_command(
+    api_key: &str,
+    device_id: &str,
+    amount_cents: i64,
+    invoice_number: &Option<String>,
+    command: &str,
+) -> Result<SolaTransactionResult, String> {
+    let amount_dollars = format!("{:.2}", amount_cents as f64 / 100.0);
     let request_id = uuid::Uuid::new_v4().to_string();
 
     let request = SolaTransactionRequest {
-        x_key: api_key.clone(),
+        x_key: api_key.to_string(),
         x_software_name: "MM Lite POS".to_string(),
         x_software_version: env!("CARGO_PKG_VERSION").to_string(),
         x_external_request_id: request_id.clone(),
-        x_command: "cc:sale".to_string(),
+        x_command: command.to_string(),
         x_amount: amount_dollars.clone(),
-        x_device_id: device_id.clone(),
+        x_device_id: device_id.to_string(),
         x_invoice: invoice_number.clone(),
     };
 
-    // Log request details (mask API key)
-    let masked_key = if api_key.len() > 10 {
-        format!("{}...{}", &api_key[..5], &api_key[api_key.len()-5..])
-    } else {
-        "***".to_string()
-    };
+    let request_info = build_request_info(
+        api_key,
+        command,
+        &amount_dollars,
+        device_id,
+        invoice_number,
+        &request_id,
+    );
+
+    // Log request details
     println!("[Sola] Transaction Request:");
-    println!("[Sola]   URL: https://device.cardknox.com/v2/session");
-    println!("[Sola]   xKey: {}", masked_key);
-    println!("[Sola]   xSoftwareName: MM Lite POS");
-    println!("[Sola]   xSoftwareVersion: {}", env!("CARGO_PKG_VERSION"));
-    println!("[Sola]   xExternalRequestId: {}", request_id);
-    println!("[Sola]   xCommand: cc:sale");
+    println!("[Sola]   URL: {}", request_info.url);
+    println!("[Sola]   xKey: {}", request_info.masked_key);
+    println!("[Sola]   xCommand: {}", command);
     println!("[Sola]   xAmount: {}", amount_dollars);
     println!("[Sola]   xDeviceId: {}", device_id);
+    println!("[Sola]   xExternalRequestId: {}", request_id);
     println!("[Sola]   xInvoice: {:?}", invoice_number);
 
-    // Use reqwest for async HTTP
+    let start = std::time::Instant::now();
+
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120)) // 2 minute timeout for card interaction
+        .timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -116,10 +219,10 @@ pub async fn process_sola_transaction(
             }
         })?;
 
-    let status = response.status();
-    println!("[Sola] Response Status: {}", status);
+    let duration_ms = start.elapsed().as_millis() as u64;
+    let http_status = response.status().as_u16();
+    println!("[Sola] Response Status: {} ({}ms)", http_status, duration_ms);
 
-    // Get response body as text first for logging
     let response_text = response.text().await.map_err(|e| {
         println!("[Sola] Failed to read response body: {}", e);
         format!("Failed to read response: {}", e)
@@ -127,12 +230,10 @@ pub async fn process_sola_transaction(
 
     println!("[Sola] Response Body: {}", response_text);
 
-    if !status.is_success() {
+    if http_status >= 400 {
         return Err(format!(
-            "HTTP error {}: {}. Response: {}",
-            status.as_u16(),
-            status.canonical_reason().unwrap_or("Unknown"),
-            response_text
+            "HTTP error {}: {}",
+            http_status, response_text
         ));
     }
 
@@ -143,5 +244,12 @@ pub async fn process_sola_transaction(
         })?;
 
     println!("[Sola] Parsed Response: {:?}", sola_response);
-    Ok(sola_response)
+
+    Ok(SolaTransactionResult {
+        request_info,
+        response: sola_response,
+        raw_response: response_text,
+        http_status,
+        duration_ms,
+    })
 }

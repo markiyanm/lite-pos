@@ -3,6 +3,7 @@
 	import ProductGrid from "$lib/components/pos/ProductGrid.svelte";
 	import OrderPanel from "$lib/components/pos/OrderPanel.svelte";
 	import PaymentModal from "$lib/components/pos/PaymentModal.svelte";
+	import ReceiptPreviewDialog from "$lib/components/receipts/ReceiptPreviewDialog.svelte";
 	import { orderStore } from "$lib/stores/order.svelte.js";
 	import { posFilters } from "$lib/stores/pos-filters.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
@@ -16,14 +17,32 @@
 		completeOrder
 	} from "$lib/commands/orders.js";
 	import { addPayment } from "$lib/commands/payments.js";
+	import { printReceipt, type ReceiptData } from "$lib/commands/printing.js";
+	import { formatCurrency } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
-	import type { Product, Category, PartialPayment } from "$lib/types/index.js";
+	import type {
+		Product,
+		Category,
+		PartialPayment,
+		Order,
+		OrderItem,
+		Payment,
+		Customer
+	} from "$lib/types/index.js";
 
 	let products = $state<Product[]>([]);
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
 	let paymentOpen = $state(false);
 	let pendingOrderNumber = $state<string>("");
+
+	// Receipt preview state
+	let receiptPreviewOpen = $state(false);
+	let pendingReceiptData = $state<ReceiptData | null>(null);
+	let pendingPreviewOrder = $state<Order | null>(null);
+	let pendingPreviewItems = $state<OrderItem[]>([]);
+	let pendingPreviewPayments = $state<Payment[]>([]);
+	let pendingPreviewCustomer = $state<Customer | null>(null);
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
 
@@ -103,6 +122,168 @@
 		orderStore.clear();
 	}
 
+	function formatDateTime(): string {
+		return new Date().toLocaleString("en-US", {
+			dateStyle: "short",
+			timeStyle: "short"
+		});
+	}
+
+	function buildReceiptData(
+		orderNumber: string,
+		payments: PartialPayment[]
+	): ReceiptData {
+		const storeName = settingsStore.get("store_name") || "Store";
+		const storeAddress = settingsStore.get("store_address") || "";
+		const storePhone = settingsStore.get("store_phone") || "";
+		const taxLabel = settingsStore.get("tax_label") || "Tax";
+		const receiptHeader = settingsStore.get("receipt_header") || "";
+		const receiptFooter = settingsStore.get("receipt_footer") || "";
+
+		return {
+			store_name: storeName,
+			store_address: storeAddress || undefined,
+			store_phone: storePhone || undefined,
+			header: receiptHeader || undefined,
+			order_number: orderNumber,
+			date: formatDateTime(),
+			customer_name: orderStore.customer
+				? `${orderStore.customer.first_name} ${orderStore.customer.last_name}`
+				: undefined,
+			items: orderStore.items.map((item) => {
+				const lineSubtotal = item.product.sale_price_cents * item.quantity;
+				const lineTax = Math.round(
+					(lineSubtotal * item.product.tax_rate_bps) / 10000
+				);
+				return {
+					name: item.product.name,
+					quantity: item.quantity,
+					unit_price: formatCurrency(
+						item.product.sale_price_cents,
+						currencySymbol
+					),
+					line_total: formatCurrency(lineSubtotal + lineTax, currencySymbol)
+				};
+			}),
+			subtotal: formatCurrency(orderStore.subtotalCents, currencySymbol),
+			discount: undefined,
+			tax_label: taxLabel,
+			tax: formatCurrency(orderStore.taxTotalCents, currencySymbol),
+			total: formatCurrency(orderStore.totalCents, currencySymbol),
+			payments: payments.map((p) => {
+				let method = "Cash";
+				if (p.method === "credit_card") method = "Card";
+				else if (p.method === "check") method = "Check";
+				else if (p.method === "other") method = "Other";
+
+				let reference: string | undefined;
+				if (p.cardDetails) {
+					reference = `${p.cardDetails.cardType} ending in ${p.cardDetails.lastFour}`;
+				}
+
+				return {
+					method,
+					amount: formatCurrency(p.amountCents, currencySymbol),
+					change:
+						p.changeCents > 0
+							? formatCurrency(p.changeCents, currencySymbol)
+							: undefined,
+					reference
+				};
+			}),
+			footer: receiptFooter || undefined
+		};
+	}
+
+	/**
+	 * Build fake Order/OrderItem/Payment objects for the ReceiptTemplate preview.
+	 * These are only used for the visual preview — the actual printing uses ReceiptData.
+	 */
+	function buildPreviewObjects(
+		orderNumber: string,
+		payments: PartialPayment[]
+	) {
+		const now = new Date().toISOString();
+
+		const previewOrder: Order = {
+			id: 0,
+			uuid: "",
+			order_number: orderNumber,
+			status: "completed",
+			customer_id: orderStore.customer?.id ?? null,
+			user_id: session.user?.id ?? 0,
+			subtotal_cents: orderStore.subtotalCents,
+			discount_cents: 0,
+			tax_total_cents: orderStore.taxTotalCents,
+			total_cents: orderStore.totalCents,
+			notes: orderStore.notes || null,
+			completed_at: now,
+			created_at: now,
+			updated_at: now,
+			deleted_at: null
+		};
+
+		const previewItems: OrderItem[] = orderStore.items.map((item, i) => {
+			const lineSubtotal = item.product.sale_price_cents * item.quantity;
+			const lineTax = Math.round(
+				(lineSubtotal * item.product.tax_rate_bps) / 10000
+			);
+			return {
+				id: i,
+				uuid: "",
+				order_id: 0,
+				product_id: item.product.id,
+				product_name: item.product.name,
+				product_sku: item.product.sku ?? null,
+				quantity: item.quantity,
+				unit_price_cents: item.product.sale_price_cents,
+				tax_rate_bps: item.product.tax_rate_bps,
+				line_subtotal_cents: lineSubtotal,
+				line_tax_cents: lineTax,
+				line_total_cents: lineSubtotal + lineTax,
+				notes: item.notes || null,
+				created_at: now,
+				updated_at: now
+			};
+		});
+
+		const previewPayments: Payment[] = payments.map((p, i) => {
+			let referenceNumber = "";
+			if (p.cardDetails) {
+				referenceNumber = `${p.cardDetails.cardType} ending in ${p.cardDetails.lastFour}, Auth: ${p.cardDetails.authCode}`;
+			}
+			return {
+				id: i,
+				uuid: "",
+				order_id: 0,
+				method: p.method,
+				amount_cents: p.amountCents,
+				change_cents: p.changeCents,
+				reference_number: referenceNumber || null,
+				card_auth_code: p.cardDetails?.authCode ?? null,
+				card_last_four: p.cardDetails?.lastFour ?? null,
+				card_type: p.cardDetails?.cardType ?? null,
+				card_entry_mode: p.cardDetails?.entryMode ?? null,
+				gateway_ref_num: p.cardDetails?.gatewayRefNum ?? null,
+				gateway_response: p.cardDetails?.gatewayResponse ?? null,
+				created_at: now,
+				updated_at: now
+			};
+		});
+
+		return { previewOrder, previewItems, previewPayments };
+	}
+
+	async function finalizeOrder() {
+		// Clear cart and close modal
+		paymentOpen = false;
+		orderStore.clear();
+
+		// Reload products to get updated stock
+		products = await getProducts({ activeOnly: true });
+		toast.success("Payment completed");
+	}
+
 	async function handlePaymentComplete(payments: PartialPayment[]) {
 		if (!session.user) return;
 
@@ -171,16 +352,53 @@
 			// Complete order
 			await completeOrder(orderId);
 
-			// Clear cart and close modal
-			paymentOpen = false;
-			orderStore.clear();
+			// Handle receipt printing
+			const receiptMode = settingsStore.get("receipt_mode") || "off";
+			const printerName = settingsStore.get("printer_name");
+			if (receiptMode !== "off" && printerName) {
+				const receiptData = buildReceiptData(orderNumber, payments);
 
-			// Reload products to get updated stock
-			products = await getProducts({ activeOnly: true });
-			toast.success("Payment completed");
+				if (receiptMode === "prompt") {
+					// Show preview dialog — defer cart clearing
+					const { previewOrder, previewItems, previewPayments } =
+						buildPreviewObjects(orderNumber, payments);
+					pendingReceiptData = receiptData;
+					pendingPreviewOrder = previewOrder;
+					pendingPreviewItems = previewItems;
+					pendingPreviewPayments = previewPayments;
+					pendingPreviewCustomer = orderStore.customer
+						? { ...orderStore.customer }
+						: null;
+					paymentOpen = false;
+					receiptPreviewOpen = true;
+					// Don't clear cart yet — wait for dialog close
+					return;
+				} else {
+					// Auto-print silently
+					try {
+						await printReceipt(receiptData, printerName);
+					} catch (err) {
+						console.error("Receipt print failed:", err);
+					}
+				}
+			}
+
+			await finalizeOrder();
 		} catch {
 			toast.error("Payment failed");
 		}
+	}
+
+	async function handleReceiptPrinted() {
+		receiptPreviewOpen = false;
+		pendingReceiptData = null;
+		await finalizeOrder();
+	}
+
+	async function handleReceiptSkipped() {
+		receiptPreviewOpen = false;
+		pendingReceiptData = null;
+		await finalizeOrder();
 	}
 
 	function handlePaymentCancel() {
@@ -223,4 +441,23 @@
 	invoiceNumber={pendingOrderNumber}
 	onComplete={handlePaymentComplete}
 	onCancel={handlePaymentCancel}
+/>
+
+<!-- Receipt preview dialog (shown when prompt-before-print is enabled) -->
+<ReceiptPreviewDialog
+	bind:open={receiptPreviewOpen}
+	receiptData={pendingReceiptData}
+	order={pendingPreviewOrder}
+	items={pendingPreviewItems}
+	payments={pendingPreviewPayments}
+	customer={pendingPreviewCustomer}
+	storeName={settingsStore.get("store_name") || "Store"}
+	storeAddress={settingsStore.get("store_address") || ""}
+	storePhone={settingsStore.get("store_phone") || ""}
+	taxLabel={settingsStore.get("tax_label") || "Tax"}
+	{currencySymbol}
+	printerType={(settingsStore.get("printer_type") || "standard") as "standard" | "thermal"}
+	printerName={settingsStore.get("printer_name") || ""}
+	onClose={handleReceiptSkipped}
+	onPrinted={handleReceiptPrinted}
 />

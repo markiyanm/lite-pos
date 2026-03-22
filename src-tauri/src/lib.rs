@@ -49,6 +49,18 @@ pub fn run() {
             sql: include_str!("../migrations/007_printer_settings.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "add printer prompt before print setting",
+            sql: include_str!("../migrations/008_printer_prompt_setting.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 9,
+            description: "replace printer_enabled and prompt with receipt_mode",
+            sql: include_str!("../migrations/009_receipt_mode.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -63,7 +75,11 @@ pub fn run() {
             crypto::encrypt_value,
             crypto::decrypt_value,
             sola::process_sola_transaction,
-            printing::get_system_printers
+            sola::cancel_sola_transaction,
+            sola::build_sola_request_info,
+            printing::get_system_printers,
+            printing::print_html,
+            printing::print_receipt
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

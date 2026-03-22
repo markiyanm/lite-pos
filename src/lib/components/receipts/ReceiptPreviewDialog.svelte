@@ -7,16 +7,18 @@
 		DialogFooter
 	} from "$lib/components/ui/dialog/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import { Printer, Loader2 } from "lucide-svelte";
+	import { Printer, Loader2, X } from "lucide-svelte";
 	import ReceiptTemplate from "./ReceiptTemplate.svelte";
 	import { printReceipt, type ReceiptData } from "$lib/commands/printing.js";
-	import { formatCurrency } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import type { Order, OrderItem, Payment, Customer } from "$lib/types/index.js";
 
 	interface Props {
 		open: boolean;
+		/** Pre-built receipt data for ESC/POS printing */
+		receiptData: ReceiptData | null;
+		/** Visual preview props for ReceiptTemplate */
 		order: Order | null;
 		items: OrderItem[];
 		payments: Payment[];
@@ -29,10 +31,12 @@
 		printerType: "standard" | "thermal";
 		printerName: string;
 		onClose: () => void;
+		onPrinted: () => void;
 	}
 
 	let {
 		open = $bindable(),
+		receiptData,
 		order,
 		items,
 		payments,
@@ -44,96 +48,32 @@
 		currencySymbol,
 		printerType,
 		printerName,
-		onClose
+		onClose,
+		onPrinted
 	}: Props = $props();
 
 	let printing = $state(false);
 	const receiptHeader = $derived(settingsStore.get("receipt_header") || "");
 	const receiptFooter = $derived(settingsStore.get("receipt_footer") || "");
 
-	function formatDateTime(dateStr: string): string {
-		const date = new Date(dateStr);
-		return date.toLocaleString("en-US", {
-			dateStyle: "short",
-			timeStyle: "short"
-		});
-	}
-
-	function getPaymentMethodLabel(method: string): string {
-		switch (method) {
-			case "cash":
-				return "Cash";
-			case "credit_card":
-				return "Card";
-			case "check":
-				return "Check";
-			case "other":
-				return "Other";
-			default:
-				return method;
-		}
-	}
-
-	function buildReceiptData(): ReceiptData | null {
-		if (!order) return null;
-
-		const receiptHeader = settingsStore.get("receipt_header") || "";
-		const receiptFooter = settingsStore.get("receipt_footer") || "";
-
-		return {
-			store_name: storeName,
-			store_address: storeAddress || undefined,
-			store_phone: storePhone || undefined,
-			header: receiptHeader || undefined,
-			order_number: order.order_number,
-			date: formatDateTime(order.completed_at || order.created_at),
-			customer_name: customer
-				? `${customer.first_name} ${customer.last_name}`
-				: undefined,
-			items: items.map((item) => ({
-				name: item.product_name,
-				quantity: item.quantity,
-				unit_price: formatCurrency(item.unit_price_cents, currencySymbol),
-				line_total: formatCurrency(item.line_total_cents, currencySymbol)
-			})),
-			subtotal: formatCurrency(order.subtotal_cents, currencySymbol),
-			discount:
-				order.discount_cents > 0
-					? formatCurrency(order.discount_cents, currencySymbol)
-					: undefined,
-			tax_label: taxLabel,
-			tax: formatCurrency(order.tax_total_cents, currencySymbol),
-			total: formatCurrency(order.total_cents, currencySymbol),
-			payments: payments.map((p) => ({
-				method: getPaymentMethodLabel(p.method),
-				amount: formatCurrency(p.amount_cents, currencySymbol),
-				change:
-					p.change_cents > 0
-						? formatCurrency(p.change_cents, currencySymbol)
-						: undefined,
-				reference: p.reference_number || undefined
-			})),
-			footer: receiptFooter || undefined
-		};
-	}
-
 	async function handlePrint() {
-		if (!order || !printerName) return;
-
-		const receipt = buildReceiptData();
-		if (!receipt) return;
+		if (!receiptData || !printerName) return;
 
 		printing = true;
 		try {
-			await printReceipt(receipt, printerName);
+			await printReceipt(receiptData, printerName);
 			toast.success("Receipt sent to printer");
-			onClose();
+			onPrinted();
 		} catch (err: any) {
 			console.error("Print error:", err);
 			toast.error(`Print failed: ${err?.message || err}`);
 		} finally {
 			printing = false;
 		}
+	}
+
+	function handleSkip() {
+		onClose();
 	}
 </script>
 
@@ -164,8 +104,11 @@
 				/>
 			</div>
 
-			<DialogFooter>
-				<Button variant="outline" onclick={onClose}>Cancel</Button>
+			<DialogFooter class="gap-2 sm:gap-0">
+				<Button variant="outline" onclick={handleSkip}>
+					<X class="h-4 w-4 mr-2" />
+					Skip
+				</Button>
 				<Button onclick={handlePrint} disabled={printing || !printerName}>
 					{#if printing}
 						<Loader2 class="h-4 w-4 mr-2 animate-spin" />

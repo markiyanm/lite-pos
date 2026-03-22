@@ -95,6 +95,7 @@
 	const printerType = $derived(
 		(settingsStore.get("printer_type") || "standard") as "standard" | "thermal"
 	);
+	const printerName = $derived(settingsStore.get("printer_name") || "");
 
 	const refundTotalCents = $derived(() => {
 		return refundItems.reduce((sum, ri) => {
@@ -757,5 +758,6 @@
 	{taxLabel}
 	{currencySymbol}
 	{printerType}
+	{printerName}
 	onClose={() => (printReceiptOpen = false)}
 />

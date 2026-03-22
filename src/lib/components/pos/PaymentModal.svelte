@@ -15,7 +15,11 @@
 	import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { decryptValue } from "$lib/commands/crypto.js";
-	import { processSolaTransaction } from "$lib/commands/sola.js";
+	import {
+		processSolaTransaction,
+		cancelSolaTransaction,
+		buildSolaRequestInfo
+	} from "$lib/commands/sola.js";
 	import DeviceSelector from "./DeviceSelector.svelte";
 	import TransactionResultDialog from "./TransactionResultDialog.svelte";
 	import type {
@@ -23,7 +27,9 @@
 		PartialPayment,
 		SolaDevice,
 		SolaDeviceListResponse,
-		SolaTransactionResponse
+		SolaTransactionResponse,
+		SolaRequestInfo,
+		SolaTransactionResult
 	} from "$lib/types/index.js";
 
 	interface Props {
@@ -51,8 +57,18 @@
 	let processing = $state(false);
 
 	// Transaction result state
-	let transactionResult = $state<SolaTransactionResponse | null>(null);
 	let transactionResultOpen = $state(false);
+	let txRequestInfo = $state<SolaRequestInfo | null>(null);
+	let txResult = $state<SolaTransactionResult | null>(null);
+	let txError = $state<string | null>(null);
+	let txPending = $state(false);
+	// Cancel state
+	let txCancelling = $state(false);
+	let txCancelRequestInfo = $state<SolaRequestInfo | null>(null);
+	let txCancelResult = $state<SolaTransactionResult | null>(null);
+	let txCancelError = $state<string | null>(null);
+	// Keep a ref to the decrypted key for cancel
+	let activeDecryptedKey = $state("");
 
 	// Partial payments tracking
 	let partialPayments = $state<PartialPayment[]>([]);
@@ -225,44 +241,73 @@
 	// Send transaction to device
 	async function handleSendToDevice() {
 		processing = true;
+
+		// Reset transaction state
+		txRequestInfo = null;
+		txResult = null;
+		txError = null;
+		txPending = true;
+		txCancelling = false;
+		txCancelRequestInfo = null;
+		txCancelResult = null;
+		txCancelError = null;
+
 		try {
 			const apiKey = settingsStore.get("sola_gateway_api_key");
 			if (!apiKey) {
 				toast.error("Sola Gateway API key not configured");
+				processing = false;
 				return;
 			}
 
 			const decryptedKey = await decryptValue(apiKey);
 			if (!decryptedKey) {
 				toast.error("Failed to decrypt API key");
+				processing = false;
 				return;
 			}
 
-			const result = await processSolaTransaction({
+			activeDecryptedKey = decryptedKey;
+
+			// Build request info and show dialog IMMEDIATELY
+			const reqInfo = await buildSolaRequestInfo({
+				apiKey: decryptedKey,
+				deviceId: selectedDeviceId,
+				amountCents: amountCents(),
+				invoiceNumber,
+				command: "cc:sale"
+			});
+			txRequestInfo = reqInfo;
+			transactionResultOpen = true;
+
+			// Now fire the actual transaction (this waits for the device)
+			const txResultData = await processSolaTransaction({
 				apiKey: decryptedKey,
 				deviceId: selectedDeviceId,
 				amountCents: amountCents(),
 				invoiceNumber
 			});
 
-			transactionResult = result;
-			transactionResultOpen = true;
+			txPending = false;
+			txResult = txResultData;
 
-			if (result.xResult === "A") {
+			const response = txResultData.response;
+
+			if (response.xResult === "A") {
 				// Approved - add to partial payments
-				const lastFour = result.xMaskedCardNumber?.slice(-4) || "";
+				const lastFour = response.xMaskedCardNumber?.slice(-4) || "";
 
 				partialPayments.push({
 					method: "credit_card",
 					amountCents: amountCents(),
 					changeCents: 0,
 					cardDetails: {
-						authCode: result.xAuthCode || "",
+						authCode: response.xAuthCode || "",
 						lastFour,
-						cardType: result.xCardType || "",
+						cardType: response.xCardType || "",
 						entryMode: "card_present",
-						gatewayRefNum: result.xRefnum,
-						gatewayResponse: JSON.stringify(result)
+						gatewayRefNum: response.xRefnum,
+						gatewayResponse: JSON.stringify(response)
 					}
 				});
 
@@ -284,8 +329,42 @@
 			// If declined or error, result dialog will show the error
 		} catch (err) {
 			console.error("Transaction error:", err);
-			toast.error(err instanceof Error ? err.message : "Transaction failed");
+			txPending = false;
+			txError = err instanceof Error ? err.message : String(err);
 		} finally {
+			processing = false;
+		}
+	}
+
+	// Cancel a pending transaction on the device
+	async function handleCancelTransaction() {
+		txCancelling = true;
+		txCancelRequestInfo = null;
+		txCancelResult = null;
+		txCancelError = null;
+
+		try {
+			// Build cancel request info and show it immediately
+			const cancelReqInfo = await buildSolaRequestInfo({
+				apiKey: activeDecryptedKey,
+				deviceId: selectedDeviceId,
+				amountCents: 0,
+				command: "cc:cancel"
+			});
+			txCancelRequestInfo = cancelReqInfo;
+
+			// Fire the cancel
+			const cancelResultData = await cancelSolaTransaction({
+				apiKey: activeDecryptedKey,
+				deviceId: selectedDeviceId
+			});
+			txCancelResult = cancelResultData;
+		} catch (err) {
+			console.error("Cancel error:", err);
+			txCancelError = err instanceof Error ? err.message : String(err);
+		} finally {
+			txCancelling = false;
+			txPending = false;
 			processing = false;
 		}
 	}
@@ -313,12 +392,17 @@
 	// Close transaction result dialog
 	function handleResultClose() {
 		transactionResultOpen = false;
-		if (transactionResult?.xResult === "A" && remainingCents() === 0) {
+		if (txResult?.response?.xResult === "A" && remainingCents() === 0) {
 			// Order was completed
 			return;
 		}
 		// Reset for retry or different payment method
-		transactionResult = null;
+		txRequestInfo = null;
+		txResult = null;
+		txError = null;
+		txCancelRequestInfo = null;
+		txCancelResult = null;
+		txCancelError = null;
 	}
 
 	// Keyboard support
@@ -352,6 +436,16 @@
 			partialPayments = [];
 			selectedDeviceId = "";
 			devices = [];
+			// Reset transaction debug state
+			txRequestInfo = null;
+			txResult = null;
+			txError = null;
+			txPending = false;
+			txCancelling = false;
+			txCancelRequestInfo = null;
+			txCancelResult = null;
+			txCancelError = null;
+			activeDecryptedKey = "";
 		}
 	});
 
@@ -647,8 +741,16 @@
 <!-- Transaction result dialog -->
 <TransactionResultDialog
 	bind:open={transactionResultOpen}
-	result={transactionResult}
+	requestInfo={txRequestInfo}
+	result={txResult}
+	error={txError}
+	pending={txPending}
 	amountCents={amountCents()}
 	{currencySymbol}
 	onClose={handleResultClose}
+	onCancel={handleCancelTransaction}
+	cancelling={txCancelling}
+	cancelRequestInfo={txCancelRequestInfo}
+	cancelResult={txCancelResult}
+	cancelError={txCancelError}
 />

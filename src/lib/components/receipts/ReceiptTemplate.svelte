@@ -10,6 +10,8 @@
 		storeName: string;
 		storeAddress: string;
 		storePhone: string;
+		receiptHeader?: string;
+		receiptFooter?: string;
 		taxLabel: string;
 		currencySymbol: string;
 		printerType: "standard" | "thermal";
@@ -23,6 +25,8 @@
 		storeName,
 		storeAddress,
 		storePhone,
+		receiptHeader = "",
+		receiptFooter = "",
 		taxLabel,
 		currencySymbol,
 		printerType
@@ -63,6 +67,9 @@
 			{#if storePhone}
 				<div class="store-info">{storePhone}</div>
 			{/if}
+			{#if receiptHeader}
+				<div class="receipt-header-text">{receiptHeader}</div>
+			{/if}
 		</div>
 
 		<div class="divider"></div>
@@ -91,16 +98,13 @@
 		<div class="items-section">
 			{#each items as item}
 				<div class="item-row">
-					<div class="item-name-qty">
+					<div class="item-name-line">
 						<span class="item-name">{item.product_name}</span>
-						<span class="item-qty">x{item.quantity}</span>
 					</div>
-					<div class="item-prices">
-						{#if item.quantity > 1}
-							<span class="item-unit-price"
-								>@{formatCurrency(item.unit_price_cents, currencySymbol)}</span
-							>
-						{/if}
+					<div class="item-detail-line">
+						<span class="item-qty-price"
+							>{item.quantity} x {formatCurrency(item.unit_price_cents, currencySymbol)}</span
+						>
 						<span class="item-total">{formatCurrency(item.line_total_cents, currencySymbol)}</span
 						>
 					</div>
@@ -156,9 +160,11 @@
 		<div class="divider"></div>
 
 		<!-- Footer -->
-		<div class="receipt-footer">
-			<div>Thank you for your business!</div>
-		</div>
+		{#if receiptFooter}
+			<div class="receipt-footer">
+				<div>{receiptFooter}</div>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -191,6 +197,12 @@
 		margin-bottom: 0.125rem;
 	}
 
+	.receipt-header-text {
+		font-size: 0.875rem;
+		margin-top: 0.375rem;
+		white-space: pre-line;
+	}
+
 	.divider {
 		border-top: 1px dashed #333;
 		margin: 0.75rem 0;
@@ -218,9 +230,7 @@
 		margin-bottom: 0.5rem;
 	}
 
-	.item-name-qty {
-		display: flex;
-		justify-content: space-between;
+	.item-name-line {
 		margin-bottom: 0.125rem;
 	}
 
@@ -228,19 +238,16 @@
 		font-weight: 500;
 	}
 
-	.item-qty {
-		margin-left: 0.5rem;
-	}
-
-	.item-prices {
+	.item-detail-line {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		font-size: 0.75rem;
-		color: #666;
+		padding-left: 1rem;
+		font-size: 0.8rem;
+		color: #444;
 	}
 
-	.item-unit-price {
+	.item-qty-price {
 		flex: 1;
 	}
 
