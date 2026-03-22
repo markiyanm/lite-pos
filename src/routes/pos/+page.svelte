@@ -35,7 +35,6 @@
 	let categories = $state<Category[]>([]);
 	let loading = $state(true);
 	let paymentOpen = $state(false);
-	let pendingOrderNumber = $state<string>("");
 
 	// Receipt preview state
 	let receiptPreviewOpen = $state(false);
@@ -69,9 +68,6 @@
 
 	async function handlePay() {
 		if (orderStore.items.length === 0) return;
-
-		// Fetch next order number to use in transaction xInvoice field
-		pendingOrderNumber = await getNextOrderNumber();
 		paymentOpen = true;
 	}
 
@@ -293,8 +289,9 @@
 		if (!session.user) return;
 
 		try {
-			// Use the order number we fetched when opening payment modal
-			const orderNumber = pendingOrderNumber;
+			// Generate order number only when actually creating the order
+			// (not when opening the payment modal, to avoid wasting numbers on cancel)
+			const orderNumber = await getNextOrderNumber();
 
 			// Wrap all DB writes in a transaction to prevent partial writes
 			await withTransaction(async () => {
@@ -446,7 +443,6 @@
 	bind:open={paymentOpen}
 	totalCents={orderStore.totalCents}
 	{currencySymbol}
-	invoiceNumber={pendingOrderNumber}
 	onComplete={handlePaymentComplete}
 	onCancel={handlePaymentCancel}
 />
