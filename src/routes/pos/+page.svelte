@@ -17,6 +17,7 @@
 		completeOrder
 	} from "$lib/commands/orders.js";
 	import { addPayment } from "$lib/commands/payments.js";
+	import { withTransaction } from "$lib/db/index.js";
 	import { printReceipt, type ReceiptData } from "$lib/commands/printing.js";
 	import { formatCurrency } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
@@ -80,36 +81,40 @@
 
 		try {
 			const orderNumber = await getNextOrderNumber();
-			const { lastInsertId: orderId } = await createOrder({
-				orderNumber,
-				userId: session.user.id,
-				customerId: orderStore.customer?.id,
-				subtotalCents: orderStore.subtotalCents,
-				discountCents: 0,
-				taxTotalCents: orderStore.taxTotalCents,
-				totalCents: orderStore.totalCents,
-				notes: orderStore.notes || undefined,
-				status: "draft"
-			});
 
-			// Add line items
-			for (const item of orderStore.items) {
-				const lineSubtotal = item.product.sale_price_cents * item.quantity;
-				const lineTax = Math.round((lineSubtotal * item.product.tax_rate_bps) / 10000);
-				await addOrderItem({
-					orderId,
-					productId: item.product.id,
-					productName: item.product.name,
-					productSku: item.product.sku ?? undefined,
-					quantity: item.quantity,
-					unitPriceCents: item.product.sale_price_cents,
-					taxRateBps: item.product.tax_rate_bps,
-					lineSubtotalCents: lineSubtotal,
-					lineTaxCents: lineTax,
-					lineTotalCents: lineSubtotal + lineTax,
-					notes: item.notes || undefined
+			// Wrap all DB writes in a transaction to prevent partial writes
+			await withTransaction(async () => {
+				const { lastInsertId: orderId } = await createOrder({
+					orderNumber,
+					userId: session.user!.id,
+					customerId: orderStore.customer?.id,
+					subtotalCents: orderStore.subtotalCents,
+					discountCents: 0,
+					taxTotalCents: orderStore.taxTotalCents,
+					totalCents: orderStore.totalCents,
+					notes: orderStore.notes || undefined,
+					status: "draft"
 				});
-			}
+
+				// Add line items
+				for (const item of orderStore.items) {
+					const lineSubtotal = item.product.sale_price_cents * item.quantity;
+					const lineTax = Math.round((lineSubtotal * item.product.tax_rate_bps) / 10000);
+					await addOrderItem({
+						orderId,
+						productId: item.product.id,
+						productName: item.product.name,
+						productSku: item.product.sku ?? undefined,
+						quantity: item.quantity,
+						unitPriceCents: item.product.sale_price_cents,
+						taxRateBps: item.product.tax_rate_bps,
+						lineSubtotalCents: lineSubtotal,
+						lineTaxCents: lineTax,
+						lineTotalCents: lineSubtotal + lineTax,
+						notes: item.notes || undefined
+					});
+				}
+			});
 
 			orderStore.clear();
 			toast.success("Draft saved");
@@ -291,66 +296,69 @@
 			// Use the order number we fetched when opening payment modal
 			const orderNumber = pendingOrderNumber;
 
-			// Create order
-			const { lastInsertId: orderId } = await createOrder({
-				orderNumber,
-				userId: session.user.id,
-				customerId: orderStore.customer?.id,
-				subtotalCents: orderStore.subtotalCents,
-				discountCents: 0,
-				taxTotalCents: orderStore.taxTotalCents,
-				totalCents: orderStore.totalCents,
-				notes: orderStore.notes || undefined,
-				status: "completed"
-			});
-
-			// Add line items + deduct stock
-			for (const item of orderStore.items) {
-				const lineSubtotal = item.product.sale_price_cents * item.quantity;
-				const lineTax = Math.round((lineSubtotal * item.product.tax_rate_bps) / 10000);
-				await addOrderItem({
-					orderId,
-					productId: item.product.id,
-					productName: item.product.name,
-					productSku: item.product.sku ?? undefined,
-					quantity: item.quantity,
-					unitPriceCents: item.product.sale_price_cents,
-					taxRateBps: item.product.tax_rate_bps,
-					lineSubtotalCents: lineSubtotal,
-					lineTaxCents: lineTax,
-					lineTotalCents: lineSubtotal + lineTax,
-					notes: item.notes || undefined
+			// Wrap all DB writes in a transaction to prevent partial writes
+			await withTransaction(async () => {
+				// Create order
+				const { lastInsertId: orderId } = await createOrder({
+					orderNumber,
+					userId: session.user!.id,
+					customerId: orderStore.customer?.id,
+					subtotalCents: orderStore.subtotalCents,
+					discountCents: 0,
+					taxTotalCents: orderStore.taxTotalCents,
+					totalCents: orderStore.totalCents,
+					notes: orderStore.notes || undefined,
+					status: "completed"
 				});
 
-				// Deduct stock
-				await adjustStock(item.product.id, -item.quantity);
-			}
+				// Add line items + deduct stock
+				for (const item of orderStore.items) {
+					const lineSubtotal = item.product.sale_price_cents * item.quantity;
+					const lineTax = Math.round((lineSubtotal * item.product.tax_rate_bps) / 10000);
+					await addOrderItem({
+						orderId,
+						productId: item.product.id,
+						productName: item.product.name,
+						productSku: item.product.sku ?? undefined,
+						quantity: item.quantity,
+						unitPriceCents: item.product.sale_price_cents,
+						taxRateBps: item.product.tax_rate_bps,
+						lineSubtotalCents: lineSubtotal,
+						lineTaxCents: lineTax,
+						lineTotalCents: lineSubtotal + lineTax,
+						notes: item.notes || undefined
+					});
 
-			// Record all payments
-			for (const payment of payments) {
-				let referenceNumber = "";
-
-				if (payment.cardDetails) {
-					referenceNumber = `${payment.cardDetails.cardType} ending in ${payment.cardDetails.lastFour}, Auth: ${payment.cardDetails.authCode}`;
+					// Deduct stock
+					await adjustStock(item.product.id, -item.quantity);
 				}
 
-				await addPayment({
-					orderId,
-					method: payment.method,
-					amountCents: payment.amountCents,
-					changeCents: payment.changeCents,
-					referenceNumber: referenceNumber || undefined,
-					cardAuthCode: payment.cardDetails?.authCode,
-					cardLastFour: payment.cardDetails?.lastFour,
-					cardType: payment.cardDetails?.cardType,
-					cardEntryMode: payment.cardDetails?.entryMode,
-					gatewayRefNum: payment.cardDetails?.gatewayRefNum,
-					gatewayResponse: payment.cardDetails?.gatewayResponse
-				});
-			}
+				// Record all payments
+				for (const payment of payments) {
+					let referenceNumber = "";
 
-			// Complete order
-			await completeOrder(orderId);
+					if (payment.cardDetails) {
+						referenceNumber = `${payment.cardDetails.cardType} ending in ${payment.cardDetails.lastFour}, Auth: ${payment.cardDetails.authCode}`;
+					}
+
+					await addPayment({
+						orderId,
+						method: payment.method,
+						amountCents: payment.amountCents,
+						changeCents: payment.changeCents,
+						referenceNumber: referenceNumber || undefined,
+						cardAuthCode: payment.cardDetails?.authCode,
+						cardLastFour: payment.cardDetails?.lastFour,
+						cardType: payment.cardDetails?.cardType,
+						cardEntryMode: payment.cardDetails?.entryMode,
+						gatewayRefNum: payment.cardDetails?.gatewayRefNum,
+						gatewayResponse: payment.cardDetails?.gatewayResponse
+					});
+				}
+
+				// Complete order
+				await completeOrder(orderId);
+			});
 
 			// Handle receipt printing
 			const receiptMode = settingsStore.get("receipt_mode") || "off";

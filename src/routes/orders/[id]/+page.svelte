@@ -35,6 +35,7 @@
 	import { getCustomer, getCustomers } from "$lib/commands/customers.js";
 	import { adjustStock } from "$lib/commands/products.js";
 	import { getRefundsByOrder, createRefund, addRefundItem, setOrderRefunded } from "$lib/commands/refunds.js";
+	import { withTransaction } from "$lib/db/index.js";
 	import { session } from "$lib/stores/session.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { formatCurrency } from "$lib/utils.js";
@@ -220,37 +221,40 @@
 		try {
 			const totalRefundCents = refundTotalCents;
 
-			// Create refund record
-			const { lastInsertId: refundId } = await createRefund({
-				orderId: order.id,
-				userId: session.user.id,
-				totalRefundCents,
-				reason: refundReason.trim() || undefined
-			});
-
-			// Add refund items + restock
-			for (const ri of itemsToRefund) {
-				const lineSubtotal = ri.unitCents * ri.qty;
-				const lineTax = Math.round((lineSubtotal * ri.taxBps) / 10000);
-				await addRefundItem({
-					refundId,
-					orderItemId: ri.orderItemId,
-					quantity: ri.qty,
-					refundAmountCents: lineSubtotal + lineTax,
-					restock: ri.restock
+			// Wrap all DB writes in a transaction to prevent partial writes
+			await withTransaction(async () => {
+				// Create refund record
+				const { lastInsertId: refundId } = await createRefund({
+					orderId: order!.id,
+					userId: session.user!.id,
+					totalRefundCents,
+					reason: refundReason.trim() || undefined
 				});
 
-				// Restock if requested
-				if (ri.restock) {
-					const item = items.find((i) => i.id === ri.orderItemId);
-					if (item?.product_id) {
-						await adjustStock(item.product_id, ri.qty);
+				// Add refund items + restock
+				for (const ri of itemsToRefund) {
+					const lineSubtotal = ri.unitCents * ri.qty;
+					const lineTax = Math.round((lineSubtotal * ri.taxBps) / 10000);
+					await addRefundItem({
+						refundId,
+						orderItemId: ri.orderItemId,
+						quantity: ri.qty,
+						refundAmountCents: lineSubtotal + lineTax,
+						restock: ri.restock
+					});
+
+					// Restock if requested
+					if (ri.restock) {
+						const item = items.find((i) => i.id === ri.orderItemId);
+						if (item?.product_id) {
+							await adjustStock(item.product_id, ri.qty);
+						}
 					}
 				}
-			}
 
-			// Mark order as refunded
-			await setOrderRefunded(order.id);
+				// Mark order as refunded
+				await setOrderRefunded(order!.id);
+			});
 
 			refundDialogOpen = false;
 			toast.success("Refund processed");
