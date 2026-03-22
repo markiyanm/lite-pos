@@ -16,11 +16,11 @@
 		disabled?: boolean;
 	}
 
-	let { devices, selectedDeviceId = $bindable(), onSelect, disabled = false }: Props = $props();
+	let { devices = $bindable(), selectedDeviceId = $bindable(), onSelect, disabled = false }: Props = $props();
 
 	const selectedDevice = $derived(devices.find((d) => d.xDeviceId === selectedDeviceId) || null);
 
-	function handleValueChange(value: string | undefined) {
+	function handleValueChange(value: string) {
 		if (value) {
 			selectedDeviceId = value;
 			onSelect(value);
@@ -42,7 +42,7 @@
 </script>
 
 <div class="space-y-2">
-	<Select value={selectedDeviceId} onValueChange={handleValueChange} {disabled}>
+	<Select type="single" value={selectedDeviceId} onValueChange={handleValueChange} {disabled}>
 		<SelectTrigger class="w-full">
 			{#if selectedDevice}
 				<span class="flex items-center gap-2">
@@ -60,6 +60,7 @@
 		<SelectContent>
 			{#each devices as device (device.xDeviceId)}
 				{@const badge = getStatusBadge(device.xDeviceStatus)}
+				{@const Icon = badge.icon}
 				<SelectItem value={device.xDeviceId}>
 					<div class="flex items-center justify-between w-full gap-3">
 						<div class="flex flex-col items-start">
@@ -69,7 +70,7 @@
 							</span>
 						</div>
 						<Badge variant={badge.variant} class="shrink-0">
-							<svelte:component this={badge.icon} class="h-3 w-3 mr-1" />
+							<Icon class="h-3 w-3 mr-1" />
 							{badge.text}
 						</Badge>
 					</div>
