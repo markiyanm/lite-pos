@@ -128,16 +128,31 @@
 			const freed = await purgeOldLogs(retentionDays);
 			const freedMB = (freed / (1024 * 1024)).toFixed(2);
 			toast.success(`Cleared old logs (${freedMB} MB freed)`);
-			// Reload dates after purge
-			await loadDates();
-			if (dates.length > 0) {
-				selectedDate = dates[0];
-			} else {
-				selectedDate = "";
-				entries = [];
-			}
+			await reloadAfterPurge();
 		} catch {
 			toast.error("Failed to clear old logs");
+		}
+	}
+
+	async function handleClearAll() {
+		try {
+			// Pass 0 days to clear ALL log files including today's
+			const freed = await purgeOldLogs(0);
+			const freedMB = (freed / (1024 * 1024)).toFixed(2);
+			toast.success(`Cleared all logs (${freedMB} MB freed)`);
+			await reloadAfterPurge();
+		} catch {
+			toast.error("Failed to clear logs");
+		}
+	}
+
+	async function reloadAfterPurge() {
+		await loadDates();
+		if (dates.length > 0) {
+			selectedDate = dates[0];
+		} else {
+			selectedDate = "";
+			entries = [];
 		}
 	}
 
@@ -269,7 +284,11 @@
 			<div class="flex items-center gap-2">
 				<Button variant="outline" size="sm" onclick={handlePurge}>
 					<Trash2 class="mr-2 h-4 w-4" />
-					Clear Old Logs
+					Purge Old
+				</Button>
+				<Button variant="destructive" size="sm" onclick={handleClearAll}>
+					<Trash2 class="mr-2 h-4 w-4" />
+					Clear All
 				</Button>
 				<Button variant="outline" size="sm" onclick={handleExport} disabled={!selectedDate}>
 					<Download class="mr-2 h-4 w-4" />

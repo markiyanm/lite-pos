@@ -370,6 +370,7 @@ pub fn purge_old_logs(
         return Ok(0);
     }
 
+    let delete_all = days == 0;
     let cutoff = Local::now() - chrono::Duration::days(days);
     let cutoff_date = cutoff.format("%Y-%m-%d").to_string();
     let mut freed: u64 = 0;
@@ -385,7 +386,7 @@ pub fn purge_old_logs(
             let without_prefix = &name[5..];
             if let Some(dot_pos) = without_prefix.find('.') {
                 let date = &without_prefix[..dot_pos];
-                if date.len() == 10 && date < cutoff_date.as_str() {
+                if date.len() == 10 && (delete_all || date < cutoff_date.as_str()) {
                     if let Ok(meta) = fs::metadata(entry.path()) {
                         freed += meta.len();
                     }

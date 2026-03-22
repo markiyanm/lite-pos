@@ -93,7 +93,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:lite-pos.db", migrations)
+                .add_migrations("sqlite:lite-pos.db?mode=rwc&busy_timeout=5000", migrations)
                 .build(),
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
