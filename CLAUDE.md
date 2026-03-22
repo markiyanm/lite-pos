@@ -117,3 +117,72 @@ GitHub Actions workflow at `.github/workflows/publish.yml`:
 - Builds for Linux (x86_64), macOS (ARM + Intel), Windows (x86_64)
 - Creates draft GitHub Release with all platform artifacts
 - Requires `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets for auto-updater
+
+## Agentic Team Workflow
+
+This project uses the Agentic Team workflow for autonomous batch work processing.
+Configuration is in `.agentic-team/config.yaml` — see that file for browser, deploy,
+pipeline, and notification settings.
+
+### Commands
+- `/auto-sweep` — Full-project audit: find bugs, create work items
+- `/auto-batch` — Queue and run batch of work items autonomously
+- `/auto-deploy-for-review` — Deploy shippable items to review environment
+- `/auto-review-shippable` — Human approval of shippable items
+- `/auto-merge` — Merge approved items into main
+- `/auto-item` — Create a single work item
+- `/auto-brief` — Decompose a project brief into work items
+- `/auto-batch-status` — Morning review dashboard
+- `/auto-board` — Terminal Kanban board
+- `/auto-sitrep` — Quick status overview
+
+### Work Item Lifecycle (10 states)
+```
+queued → defining → planning → designing → implementing → reviewing → testing → browser-testing → shippable → done
+```
+
+### Pipeline Templates
+- `fullstack` — All 10 states
+- `backend` — Skip designing, browser-testing
+- `frontend` — All 10 states
+- `bugfix` — Skip planning, designing
+- `refactor` — Skip defining, designing
+
+### Human Gates
+Only `shippable → done` requires human approval. All other transitions are automated.
+
+### Testing Rules
+
+**Every code change must include tests.** This is enforced by the pipeline — the QA
+persona will send items back to implementing if tests are missing.
+
+**Backend tests:**
+- Every new endpoint or handler must have at least one test
+- Every bug fix must include a regression test that would have caught the bug
+- Test both success paths and error/edge-case paths (invalid input, auth failures, empty results)
+- Run the full backend test suite before advancing past the testing stage
+
+**Frontend tests:**
+- Every new component must have at least one test
+- Test user interactions (clicks, form submissions, navigation)
+- Test error states and loading states
+- Run the full frontend test suite before advancing past the testing stage
+
+**Browser/UI tests (automated via Playwright):**
+- Test all routes affected by the change at desktop (1280px) and mobile (375px)
+- Test interactive flows end-to-end (not just isolated components)
+- Screenshot evidence is required for visual changes
+- Auth-gated routes require a dev auth bypass — if none exists, create one as a work item
+
+**Test coverage expectations:**
+- New code should not decrease overall test coverage
+- Security-sensitive code (auth, input validation, permissions) must have dedicated tests
+- Items tagged `test-coverage` must include the specific missing test described in the work item
+
+### Project Structure
+- `docs/work-items/{status}/` — Work item files organized by status (10 folders)
+- `docs/work-items/index.yaml` — Master index
+- `docs/work-items/{slug}/` — Per-item persona artifacts
+- `docs/research/`, `docs/design/`, `docs/architecture/` — Support artifacts
+- `docs/planning/` — Implementation plans
+- `.agentic-team/` — Batch state, browser daemon, config

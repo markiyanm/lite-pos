@@ -5,3 +5,5 @@ build/
 .env.*
 !.env.example
 nul
+.agentic-team/browser/
+.agentic-team/batches/

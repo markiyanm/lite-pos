@@ -1,0 +1,32 @@
+version: 2
+pipelines:
+  default: fullstack
+  available:
+  - fullstack
+  - backend
+  - frontend
+  - bugfix
+  - refactor
+concurrency: 3
+max_reworks: 3
+browser:
+  enabled: true
+  dev_url: http://localhost:1420
+  start_command: npm run dev
+  public_routes:
+  - /login
+  auth:
+    method: pin-login
+    bypass_available: false
+    default_pin: '1234'
+  auth_profiles: []
+deploy:
+  staging_branch: staging
+  review_environment:
+    name: ''
+    host: ''
+    deploy_command: ''
+    url: ''
+    healthcheck: ''
+notifications:
+  enabled: false

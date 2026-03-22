@@ -1,0 +1,218 @@
+items:
+- slug: fix-deviceselector-select-valueonvaluechange-type-mismatch
+  title: Fix DeviceSelector Select value/onValueChange type mismatch
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - card-present
+  created_at: '2026-03-22T00:29:27Z'
+  updated_at: '2026-03-22T00:29:27Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-deviceselector-select-valueonvaluechange-type-mismatch.md
+- slug: fix-paymentmodal-binddevices-on-non-bindable-deviceselector-prop
+  title: Fix PaymentModal bind:devices on non-bindable DeviceSelector prop
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - card-present
+  created_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T00:29:37Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-paymentmodal-binddevices-on-non-bindable-deviceselector-prop.md
+- slug: add-disabled-prop-to-settingtoggle-to-enforce-admin-only-settings
+  title: Add disabled prop to SettingToggle to enforce admin-only settings
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - permissions
+  - admin
+  created_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T00:29:37Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/add-disabled-prop-to-settingtoggle-to-enforce-admin-only-settings.md
+- slug: fix-order-number-consumed-on-payment-modal-cancel
+  title: Fix order number consumed on payment modal cancel
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - orders
+  created_at: '2026-03-22T00:29:37Z'
+  updated_at: '2026-03-22T00:29:37Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-order-number-consumed-on-payment-modal-cancel.md
+- slug: fix-typeof-import-type-assertion-error-in-settings-page
+  title: Fix typeof import type assertion error in settings page
+  status: queued
+  pipeline: bugfix
+  priority: P2
+  tags:
+  - sweep
+  - typescript
+  created_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T00:29:51Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-typeof-import-type-assertion-error-in-settings-page.md
+- slug: remove-or-implement-printhtml-windows-stub-in-printingrs
+  title: Remove or implement print_html Windows stub in printing.rs
+  status: queued
+  pipeline: bugfix
+  priority: P2
+  tags:
+  - sweep
+  - printing
+  created_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T00:29:51Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/remove-or-implement-printhtml-windows-stub-in-printingrs.md
+- slug: fix-escpos-column-layout-for-non-ascii-characters
+  title: Fix ESC/POS column layout for non-ASCII characters
+  status: queued
+  pipeline: bugfix
+  priority: P2
+  tags:
+  - sweep
+  - printing
+  - i18n
+  created_at: '2026-03-22T00:29:51Z'
+  updated_at: '2026-03-22T00:29:51Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-escpos-column-layout-for-non-ascii-characters.md
+- slug: replace-deprecated-sveltecomponent-in-deviceselector
+  title: Replace deprecated svelte:component in DeviceSelector
+  status: queued
+  pipeline: bugfix
+  priority: P2
+  tags:
+  - sweep
+  - svelte5
+  created_at: '2026-03-22T00:29:55Z'
+  updated_at: '2026-03-22T00:29:55Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/replace-deprecated-sveltecomponent-in-deviceselector.md
+- slug: wrap-order-creation-in-a-db-transaction-to-prevent-partial-writes
+  title: Wrap order creation in a DB transaction to prevent partial writes
+  status: queued
+  pipeline: bugfix
+  priority: P0
+  tags:
+  - sweep
+  - data-integrity
+  - orders
+  created_at: '2026-03-22T00:48:39Z'
+  updated_at: '2026-03-22T00:48:39Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/wrap-order-creation-in-a-db-transaction-to-prevent-partial-writes.md
+- slug: add-admin-guard-on-routes-and-data-modifying-commands
+  title: Add admin guard on routes and data-modifying commands
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - security
+  - permissions
+  created_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T00:48:55Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/add-admin-guard-on-routes-and-data-modifying-commands.md
+- slug: hash-user-pins-instead-of-storing-plaintext
+  title: Hash user PINs instead of storing plaintext
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - security
+  - auth
+  created_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T00:48:55Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/hash-user-pins-instead-of-storing-plaintext.md
+- slug: replace-hardcoded-aes-encryption-key-with-os-keychain
+  title: Replace hardcoded AES encryption key with OS keychain
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - security
+  - crypto
+  created_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T00:48:55Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/replace-hardcoded-aes-encryption-key-with-os-keychain.md
+- slug: fix-derived-reactivity-replace-derived-with-derivedby-across-codebase
+  title: Fix derived reactivity - replace derived(() =>) with derived.by() across
+    codebase
+  status: queued
+  pipeline: bugfix
+  priority: P1
+  tags:
+  - sweep
+  - svelte5
+  - performance
+  created_at: '2026-03-22T00:48:55Z'
+  updated_at: '2026-03-22T00:48:55Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/fix-derived-reactivity-replace-derived-with-derivedby-across-codebase.md
+- slug: add-persistent-error-state-ui-for-failed-data-loading
+  title: Add persistent error state UI for failed data loading
+  status: queued
+  pipeline: frontend
+  priority: P2
+  tags:
+  - sweep
+  - ux
+  - error-handling
+  created_at: '2026-03-22T00:49:05Z'
+  updated_at: '2026-03-22T00:49:05Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/add-persistent-error-state-ui-for-failed-data-loading.md
+- slug: clean-up-stray-nul-file-and-add-to-gitignore
+  title: Clean up stray nul file and add to gitignore
+  status: queued
+  pipeline: bugfix
+  priority: P2
+  tags:
+  - sweep
+  - cleanup
+  created_at: '2026-03-22T00:49:06Z'
+  updated_at: '2026-03-22T00:49:06Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/clean-up-stray-nul-file-and-add-to-gitignore.md
+- slug: remove-dead-code-exports-from-commands-modules
+  title: Remove dead code exports from commands modules
+  status: queued
+  pipeline: refactor
+  priority: P2
+  tags:
+  - sweep
+  - dead-code
+  created_at: '2026-03-22T00:49:13Z'
+  updated_at: '2026-03-22T00:49:13Z'
+  dependencies: []
+  blocked_by: []
+  file: docs/work-items/queued/remove-dead-code-exports-from-commands-modules.md
