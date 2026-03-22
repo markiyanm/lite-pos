@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Banknote, CreditCard, FileCheck, Delete, Loader2, RefreshCw } from "lucide-svelte";
+	import { Banknote, CreditCard, FileCheck, Delete, Loader2, RefreshCw, Lock, AlertCircle } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import {
 		Dialog,
@@ -18,10 +18,15 @@
 	import {
 		processSolaTransaction,
 		cancelSolaTransaction,
-		buildSolaRequestInfo
+		buildSolaRequestInfo,
+		processSolaCnpTransaction,
+		processSolaTokenTransaction
 	} from "$lib/commands/sola.js";
+	import { getCustomerTokens, createPaymentToken } from "$lib/commands/payment-tokens.js";
+	import { loadIfields, isIfieldsLoaded, IFIELDS_IFRAME_URL } from "$lib/utils/ifields-loader.js";
 	import DeviceSelector from "./DeviceSelector.svelte";
 	import TransactionResultDialog from "./TransactionResultDialog.svelte";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import type {
 		PaymentMethod,
 		PartialPayment,
@@ -29,18 +34,20 @@
 		SolaDeviceListResponse,
 		SolaTransactionResponse,
 		SolaRequestInfo,
-		SolaTransactionResult
+		SolaTransactionResult,
+		CustomerPaymentToken
 	} from "$lib/types/index.js";
 
 	interface Props {
 		open: boolean;
 		totalCents: number;
 		currencySymbol: string;
+		customerId?: number | null;
 		onComplete: (payments: PartialPayment[]) => void;
 		onCancel: () => void;
 	}
 
-	let { open = $bindable(), totalCents, currencySymbol, onComplete, onCancel }: Props = $props();
+	let { open = $bindable(), totalCents, currencySymbol, customerId = null, onComplete, onCancel }: Props = $props();
 
 	// Generate a temporary invoice reference for Sola gateway transactions.
 	// This is NOT the order number — the real order number is assigned when the order is created.
@@ -62,6 +69,60 @@
 	let devices = $state<SolaDevice[]>([]);
 	let loadingDevices = $state(false);
 	let processing = $state(false);
+
+	// Card not present (iFields) state
+	let cnpLoading = $state(false);
+	let cnpLoadError = $state<string | null>(null);
+	let cnpInitialized = $state(false);
+	let cnpCardNumberValid = $state(false);
+	let cnpCvvValid = $state(false);
+	let cnpCardBrand = $state("");
+	let cnpExpiry = $state("");
+	let cnpName = $state("");
+	let cnpZip = $state("");
+	let cnpProcessing = $state(false);
+
+	const cnpExpiryFormatted = $derived.by(() => {
+		// Convert MM/YY or MMYY to MMYY for gateway
+		return cnpExpiry.replace(/\//g, "");
+	});
+
+	const cnpExpiryValid = $derived.by(() => {
+		const digits = cnpExpiry.replace(/\D/g, "");
+		if (digits.length !== 4) return false;
+		const month = parseInt(digits.substring(0, 2), 10);
+		return month >= 1 && month <= 12;
+	});
+
+	const canProcessCnp = $derived.by(() => {
+		return (
+			cnpCardNumberValid &&
+			cnpCvvValid &&
+			cnpExpiryValid &&
+			remainingCents > 0 &&
+			!cnpProcessing &&
+			!processing
+		);
+	});
+
+	// Card on file state
+	let savedCards = $state<CustomerPaymentToken[]>([]);
+	let selectedSavedCard = $state<CustomerPaymentToken | null>(null);
+	let saveCardChecked = $state(false);
+	let tokenProcessing = $state(false);
+
+	const cardOnFileEnabled = $derived.by(() => {
+		return settingsStore.getBoolean("enable_card_on_file") && !!customerId;
+	});
+
+	const canPayWithToken = $derived.by(() => {
+		return (
+			selectedSavedCard !== null &&
+			remainingCents > 0 &&
+			!tokenProcessing &&
+			!processing
+		);
+	});
 
 	// Transaction result state
 	let transactionResultOpen = $state(false);
@@ -172,8 +233,12 @@
 				}
 			} else {
 				// Fall back to card not present if card present not enabled
-				cardPaymentType = "card_not_present";
-				setExact();
+				const cnpEnabled = settingsStore.getBoolean("sola_gateway_card_not_present") && !!settingsStore.get("ifields_key");
+				if (cnpEnabled) {
+					cardPaymentType = "card_not_present";
+					setExact();
+					initIfields();
+				}
 			}
 		} else {
 			cardPaymentType = null;
@@ -192,6 +257,179 @@
 
 		if (type === "card_present" && devices.length === 0) {
 			loadDevices();
+		}
+
+		if (type === "card_not_present") {
+			initIfields();
+		}
+	}
+
+	// Initialize iFields for CNP
+	async function initIfields() {
+		if (cnpInitialized || cnpLoading) return;
+		cnpLoading = true;
+		cnpLoadError = null;
+
+		try {
+			await loadIfields();
+
+			// Get iFields key
+			const encryptedIfieldsKey = settingsStore.get("ifields_key");
+			if (!encryptedIfieldsKey) {
+				cnpLoadError = "iFields key not configured. Go to Settings > Payments to add it.";
+				return;
+			}
+
+			const ifieldsKey = await decryptValue(encryptedIfieldsKey);
+			if (!ifieldsKey) {
+				cnpLoadError = "Failed to decrypt iFields key.";
+				return;
+			}
+
+			// Initialize iFields account
+			setAccount(ifieldsKey, "Vira", "1.0.0");
+
+			// Apply styles to match our UI
+			const isDark = document.documentElement.classList.contains("dark");
+			const style = isDark
+				? "border: 1px solid hsl(240 3.7% 25%); border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; background: hsl(240 10% 3.9%); color: hsl(0 0% 98%); width: 100%; height: 36px; box-sizing: border-box;"
+				: "border: 1px solid hsl(240 5.9% 80%); border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; background: hsl(0 0% 100%); color: hsl(240 10% 3.9%); width: 100%; height: 36px; box-sizing: border-box;";
+
+			setIfieldStyle("card-number", style);
+			setIfieldStyle("cvv", style);
+
+			// Enable auto-formatting
+			enableAutoFormatting("-");
+
+			// Set up keypress callback for card brand detection and validation
+			addIfieldKeyPressCallback((data: IfieldsKeyPressData) => {
+				cnpCardNumberValid = data.cardNumberIsValid;
+				cnpCvvValid = data.cvvIsValid;
+				if (data.issuer) {
+					cnpCardBrand = data.issuer;
+				}
+			});
+
+			cnpInitialized = true;
+		} catch (err) {
+			console.error("Failed to initialize iFields:", err);
+			cnpLoadError =
+				"Card entry is unavailable. Please check your internet connection or use another payment method.";
+		} finally {
+			cnpLoading = false;
+		}
+	}
+
+	// Handle expiry input formatting (MM/YY)
+	function handleExpiryInput(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		let val = input.value.replace(/\D/g, "");
+		if (val.length > 4) val = val.substring(0, 4);
+		if (val.length >= 3) {
+			val = val.substring(0, 2) + "/" + val.substring(2);
+		}
+		cnpExpiry = val;
+		input.value = val;
+	}
+
+	// Process CNP payment
+	async function handleCnpPayment() {
+		cnpProcessing = true;
+		processing = true;
+
+		try {
+			const apiKey = settingsStore.get("sola_gateway_api_key");
+			if (!apiKey) {
+				toast.error("Sola Gateway API key not configured");
+				return;
+			}
+
+			const decryptedKey = await decryptValue(apiKey);
+			if (!decryptedKey) {
+				toast.error("Failed to decrypt API key");
+				return;
+			}
+
+			// Step 1: Get tokens from iFields
+			const tokens = await new Promise<void>((resolve, reject) => {
+				getTokens(
+					() => resolve(),
+					(error: IfieldsError) => reject(new Error(error.errorMessage || "Failed to get card tokens")),
+					30000
+				);
+			});
+
+			// Step 2: Read token values from hidden inputs
+			const cardTokenEl = document.querySelector('[data-ifields-id="card-number-token"]') as HTMLInputElement;
+			const cvvTokenEl = document.querySelector('[data-ifields-id="cvv-token"]') as HTMLInputElement;
+
+			if (!cardTokenEl?.value || !cvvTokenEl?.value) {
+				throw new Error("Card tokens not available. Please try again.");
+			}
+
+			// Step 3: Send to gateway via Rust command
+			const result = await processSolaCnpTransaction({
+				apiKey: decryptedKey,
+				cardToken: cardTokenEl.value,
+				cvvToken: cvvTokenEl.value,
+				exp: cnpExpiryFormatted,
+				amountCents: remainingCents,
+				invoiceNumber,
+				name: cnpName || undefined,
+				zip: cnpZip || undefined
+			});
+
+			const response = result.response;
+
+			if (response.xResult === "A") {
+				// Approved
+				const lastFour = response.xMaskedCardNumber?.slice(-4) || "";
+
+				partialPayments.push({
+					method: "credit_card",
+					amountCents: remainingCents,
+					changeCents: 0,
+					cardDetails: {
+						authCode: response.xAuthCode || "",
+						lastFour,
+						cardType: response.xCardType || "",
+						entryMode: "keyed",
+						gatewayRefNum: response.xRefnum,
+						gatewayResponse: JSON.stringify(response)
+					}
+				});
+
+				toast.success("Payment approved");
+
+				// Save card token if checkbox was checked
+				await maybeSaveCardToken(response);
+
+				if (remainingCents === 0) {
+					onComplete(partialPayments);
+				} else {
+					amountInput = "";
+					selectedMethod = "cash";
+					cardPaymentType = null;
+					toast.success(
+						`Collected ${formatCurrency(remainingCents, currencySymbol)}. ${formatCurrency(remainingCents, currencySymbol)} remaining.`
+					);
+				}
+			} else if (response.xResult === "D") {
+				toast.error(`Payment declined: ${response.xError || "Unknown reason"}`);
+			} else {
+				toast.error(`Payment error: ${response.xError || "Unknown error"}`);
+			}
+		} catch (err) {
+			console.error("CNP transaction error:", err);
+			const message = err instanceof Error ? err.message : String(err);
+			if (message.includes("timed out") || message.includes("timeout")) {
+				toast.error("Card processing timed out. Please try again.");
+			} else {
+				toast.error(message);
+			}
+		} finally {
+			cnpProcessing = false;
+			processing = false;
 		}
 	}
 
@@ -318,6 +556,9 @@
 					}
 				});
 
+				// Save card token if checkbox was checked
+				await maybeSaveCardToken(response);
+
 				// Check if fully paid
 				if (remainingCents === 0) {
 					// Close result dialog and complete order
@@ -396,6 +637,110 @@
 		}
 	}
 
+	// Pay with saved card token
+	async function handlePayWithToken() {
+		if (!selectedSavedCard || !customerId) return;
+		tokenProcessing = true;
+
+		try {
+			const apiKey = settingsStore.get("sola_gateway_api_key");
+			if (!apiKey) {
+				toast.error("Sola Gateway API key not configured");
+				return;
+			}
+
+			const decryptedKey = await decryptValue(apiKey);
+			if (!decryptedKey) {
+				toast.error("Failed to decrypt API key");
+				return;
+			}
+
+			// Decrypt the saved token
+			const decryptedToken = await decryptValue(selectedSavedCard.token);
+			if (!decryptedToken) {
+				toast.error("Failed to decrypt saved card token");
+				return;
+			}
+
+			const result = await processSolaTokenTransaction({
+				apiKey: decryptedKey,
+				token: decryptedToken,
+				amountCents: remainingCents,
+				invoiceNumber
+			});
+
+			const response = result.response;
+
+			if (response.xResult === "A") {
+				// Approved
+				const lastFour = selectedSavedCard.card_last_four;
+
+				partialPayments.push({
+					method: "credit_card",
+					amountCents: remainingCents,
+					changeCents: 0,
+					cardDetails: {
+						authCode: response.xAuthCode || "",
+						lastFour,
+						cardType: selectedSavedCard.card_brand || response.xCardType || "",
+						entryMode: "token",
+						gatewayRefNum: response.xRefnum,
+						gatewayResponse: JSON.stringify(response)
+					}
+				});
+
+				if (remainingCents === 0) {
+					onComplete(partialPayments);
+				} else {
+					amountInput = "";
+					selectedMethod = "cash";
+					cardPaymentType = null;
+					selectedSavedCard = null;
+					toast.success(
+						`Collected ${formatCurrency(remainingCents, currencySymbol)} via saved card. ${formatCurrency(remainingCents, currencySymbol)} remaining.`
+					);
+				}
+			} else {
+				toast.error(response.xError || "Transaction declined");
+			}
+		} catch (err) {
+			console.error("Token transaction error:", err);
+			toast.error(err instanceof Error ? err.message : "Transaction failed");
+		} finally {
+			tokenProcessing = false;
+		}
+	}
+
+	// Save card token after successful transaction (if checkbox checked)
+	async function maybeSaveCardToken(response: SolaTransactionResponse) {
+		if (!saveCardChecked || !customerId || !response.xToken) return;
+		try {
+			const maskedNum = response.xMaskedCardNumber || "";
+			const lastFour = maskedNum.slice(-4);
+			const expStr = response.xExp || "";
+			let expMonth: number | null = null;
+			let expYear: number | null = null;
+			if (expStr.length === 4) {
+				expMonth = parseInt(expStr.substring(0, 2), 10);
+				expYear = 2000 + parseInt(expStr.substring(2, 4), 10);
+			}
+
+			await createPaymentToken({
+				customerId,
+				token: response.xToken,
+				cardLastFour: lastFour,
+				cardBrand: response.xCardType || null,
+				expMonth,
+				expYear,
+				isDefault: savedCards.length === 0 // first card becomes default
+			});
+			toast.success("Card saved for future use");
+		} catch (err) {
+			// FR-8: don't fail the transaction
+			console.error("Failed to save card token:", err);
+		}
+	}
+
 	// Close transaction result dialog
 	function handleResultClose() {
 		transactionResultOpen = false;
@@ -454,6 +799,29 @@
 			txCancelResult = null;
 			txCancelError = null;
 			activeDecryptedKey = "";
+			// Reset CNP state
+			cnpLoadError = null;
+			cnpInitialized = false;
+			cnpCardNumberValid = false;
+			cnpCvvValid = false;
+			cnpCardBrand = "";
+			cnpExpiry = "";
+			cnpName = "";
+			cnpZip = "";
+			cnpProcessing = false;
+			// Reset card-on-file state
+			savedCards = [];
+			selectedSavedCard = null;
+			saveCardChecked = false;
+			tokenProcessing = false;
+			// Load saved cards if customer is attached and card-on-file enabled
+			if (customerId && settingsStore.getBoolean("enable_card_on_file")) {
+				getCustomerTokens(customerId).then((tokens) => {
+					savedCards = tokens;
+				}).catch(() => {
+					// Non-fatal — just no saved cards shown
+				});
+			}
 		}
 	});
 
@@ -547,7 +915,7 @@
 							Card Present
 						</Button>
 					{/if}
-					{#if settingsStore.getBoolean("sola_gateway_card_not_present")}
+					{#if settingsStore.getBoolean("sola_gateway_card_not_present") && settingsStore.get("ifields_key")}
 						<Button
 							variant={cardPaymentType === "card_not_present" ? "default" : "outline"}
 							class="flex-1"
@@ -559,8 +927,50 @@
 				</div>
 			{/if}
 
+			<!-- Saved cards section -->
+			{#if selectedMethod === "credit_card" && savedCards.length > 0 && cardOnFileEnabled}
+				<div class="space-y-2">
+					<Label class="text-xs text-muted-foreground">Saved Cards</Label>
+					{#each savedCards as card (card.id)}
+						<Button
+							variant={selectedSavedCard?.id === card.id ? "default" : "outline"}
+							class="w-full justify-start gap-3"
+							onclick={() => {
+								selectedSavedCard = selectedSavedCard?.id === card.id ? null : card;
+								if (selectedSavedCard) {
+									cardPaymentType = null;
+								}
+							}}
+						>
+							<CreditCard class="h-4 w-4" />
+							<span class="text-sm">
+								{card.card_brand || "Card"} **** {card.card_last_four}
+							</span>
+							{#if card.exp_month && card.exp_year}
+								<span class="text-xs text-muted-foreground">
+									{String(card.exp_month).padStart(2, "0")}/{String(card.exp_year).slice(-2)}
+								</span>
+							{/if}
+							{#if card.is_default}
+								<Badge variant="secondary" class="ml-auto text-xs">Default</Badge>
+							{/if}
+						</Button>
+					{/each}
+					{#if selectedSavedCard}
+						<Separator />
+					{:else}
+						<div class="relative">
+							<Separator />
+							<span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
+								or pay with new card
+							</span>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Card present flow -->
-			{#if selectedMethod === "credit_card" && cardPaymentType === "card_present"}
+			{#if selectedMethod === "credit_card" && cardPaymentType === "card_present" && !selectedSavedCard}
 				<div class="space-y-3">
 					<!-- Device selection -->
 					<div>
@@ -621,10 +1031,110 @@
 			{/if}
 
 			<!-- Card not present (key in) -->
-			{#if selectedMethod === "credit_card" && cardPaymentType === "card_not_present"}
-				<div class="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-					Card not present (key in) coming soon
-				</div>
+			{#if selectedMethod === "credit_card" && cardPaymentType === "card_not_present" && !selectedSavedCard}
+				{#if cnpLoading}
+					<div class="flex items-center justify-center gap-2 rounded-md border p-6 text-sm text-muted-foreground">
+						<Loader2 class="h-4 w-4 animate-spin" />
+						Loading secure card entry...
+					</div>
+				{:else if cnpLoadError}
+					<div class="rounded-md border border-destructive/50 bg-destructive/10 p-4 space-y-2">
+						<div class="flex items-center gap-2 text-sm text-destructive">
+							<AlertCircle class="h-4 w-4" />
+							{cnpLoadError}
+						</div>
+						<Button variant="outline" size="sm" onclick={() => { cnpInitialized = false; initIfields(); }}>
+							Retry
+						</Button>
+					</div>
+				{:else if cnpInitialized}
+					<div class="space-y-3">
+						<!-- Secure entry label -->
+						<div class="flex items-center gap-2 text-xs text-muted-foreground">
+							<Lock class="h-3 w-3" />
+							<span>Secure Entry</span>
+						</div>
+
+						<!-- Amount display -->
+						<div class="flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
+							<span class="text-sm text-muted-foreground">Amount</span>
+							<span class="text-lg font-bold">{formatCurrency(remainingCents, currencySymbol)}</span>
+						</div>
+
+						<!-- Card Number -->
+						<div class="space-y-1.5">
+							<div class="flex items-center justify-between">
+								<Label class="text-sm">Card Number</Label>
+								{#if cnpCardBrand}
+									<span class="text-xs font-medium text-muted-foreground uppercase">{cnpCardBrand}</span>
+								{/if}
+							</div>
+							<iframe
+								data-ifields-id="card-number"
+								data-ifields-placeholder="Card number"
+								src={IFIELDS_IFRAME_URL}
+								title="Card Number"
+								class="h-9 w-full rounded-md"
+								style="border: none;"
+							></iframe>
+							<input type="hidden" data-ifields-id="card-number-token" />
+						</div>
+
+						<!-- Expiry + CVV row -->
+						<div class="grid grid-cols-2 gap-3">
+							<div class="space-y-1.5">
+								<Label class="text-sm">Expiration</Label>
+								<Input
+									type="text"
+									placeholder="MM/YY"
+									value={cnpExpiry}
+									oninput={handleExpiryInput}
+									maxlength={5}
+									disabled={cnpProcessing}
+								/>
+							</div>
+							<div class="space-y-1.5">
+								<Label class="text-sm">CVV</Label>
+								<iframe
+									data-ifields-id="cvv"
+									data-ifields-placeholder="CVV"
+									src={IFIELDS_IFRAME_URL}
+									title="CVV"
+									class="h-9 w-full rounded-md"
+									style="border: none;"
+								></iframe>
+								<input type="hidden" data-ifields-id="cvv-token" />
+							</div>
+						</div>
+
+						<!-- Name -->
+						<div class="space-y-1.5">
+							<Label class="text-sm">Cardholder Name <span class="text-muted-foreground">(optional)</span></Label>
+							<Input
+								type="text"
+								placeholder="Name on card"
+								bind:value={cnpName}
+								disabled={cnpProcessing}
+							/>
+						</div>
+
+						<!-- ZIP -->
+						<div class="space-y-1.5">
+							<Label class="text-sm">Billing ZIP <span class="text-muted-foreground">(optional)</span></Label>
+							<Input
+								type="text"
+								placeholder="ZIP code"
+								bind:value={cnpZip}
+								maxlength={10}
+								disabled={cnpProcessing}
+							/>
+						</div>
+					</div>
+				{:else}
+					<div class="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+						Initializing secure card entry...
+					</div>
+				{/if}
 			{/if}
 
 			<!-- Cash payment flow -->
@@ -710,6 +1220,14 @@
 				</div>
 			{/if}
 
+			<!-- Save card checkbox -->
+			{#if selectedMethod === "credit_card" && !selectedSavedCard && cardOnFileEnabled && (cardPaymentType === "card_present" || cardPaymentType === "card_not_present")}
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={saveCardChecked} class="rounded" />
+					Save card for future use
+				</label>
+			{/if}
+
 			<Separator />
 
 			<!-- Action buttons -->
@@ -718,7 +1236,16 @@
 					Cancel
 				</Button>
 
-				{#if selectedMethod === "credit_card" && cardPaymentType === "card_present"}
+				{#if selectedMethod === "credit_card" && selectedSavedCard}
+					<Button class="flex-1" disabled={!canPayWithToken} onclick={handlePayWithToken}>
+						{#if tokenProcessing}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Processing...
+						{:else}
+							Pay with Saved Card
+						{/if}
+					</Button>
+				{:else if selectedMethod === "credit_card" && cardPaymentType === "card_present"}
 					<Button class="flex-1" disabled={!canSendToDevice} onclick={handleSendToDevice}>
 						{#if processing}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -726,8 +1253,13 @@
 						Send to Device
 					</Button>
 				{:else if selectedMethod === "credit_card" && cardPaymentType === "card_not_present"}
-					<Button class="flex-1" disabled>
-						Coming Soon
+					<Button class="flex-1" disabled={!canProcessCnp} onclick={handleCnpPayment}>
+						{#if cnpProcessing}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Processing...
+						{:else}
+							Process Payment
+						{/if}
 					</Button>
 				{:else}
 					<Button

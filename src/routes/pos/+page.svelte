@@ -461,6 +461,7 @@
 	bind:open={paymentOpen}
 	totalCents={orderStore.totalCents}
 	{currencySymbol}
+	customerId={orderStore.customer?.id ?? null}
 	onComplete={handlePaymentComplete}
 	onCancel={handlePaymentCancel}
 />

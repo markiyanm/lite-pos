@@ -209,6 +209,7 @@ export interface SolaTransactionResponse {
 	xError?: string;
 	xAmt?: string;
 	xEntryMethod?: string;
+	xToken?: string;
 }
 
 export interface SolaRequestInfo {
@@ -232,6 +233,26 @@ export interface SolaTransactionResult {
 	duration_ms: number;
 }
 
+export interface SolaCnpRequestInfo {
+	url: string;
+	command: string;
+	amount: string;
+	invoice: string | null;
+	request_id: string;
+	masked_key: string;
+	software_name: string;
+	software_version: string;
+	timestamp: string;
+}
+
+export interface SolaCnpTransactionResult {
+	request_info: SolaCnpRequestInfo;
+	response: SolaTransactionResponse;
+	raw_response: string;
+	http_status: number;
+	duration_ms: number;
+}
+
 export interface PartialPayment {
 	method: PaymentMethod;
 	amountCents: number;
@@ -244,6 +265,32 @@ export interface PartialPayment {
 		gatewayRefNum: string;
 		gatewayResponse: string;
 	};
+}
+
+// ---- Customer Payment Tokens ----
+export interface CustomerPaymentToken {
+	id: number;
+	uuid: string;
+	customer_id: number;
+	gateway_payment_method_id: string | null;
+	token: string; // encrypted at rest — never contains plaintext on frontend
+	card_last_four: string;
+	card_brand: string | null;
+	exp_month: number | null;
+	exp_year: number | null;
+	is_default: number; // 0 or 1
+	gateway_revision: number | null;
+	created_at: string;
+	updated_at: string;
+	deleted_at: string | null;
+}
+
+export interface SolaSaveCardResult {
+	request_info: SolaCnpRequestInfo;
+	response: SolaTransactionResponse;
+	raw_response: string;
+	http_status: number;
+	duration_ms: number;
 }
 
 // ---- POS-specific types ----

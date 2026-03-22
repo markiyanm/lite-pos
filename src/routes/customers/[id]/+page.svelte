@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
-	import { Users, ArrowLeft, Save, Loader2, ShoppingBag } from "lucide-svelte";
+	import { Users, ArrowLeft, Save, Loader2, ShoppingBag, CreditCard, Trash2, Star } from "lucide-svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
@@ -18,11 +18,23 @@
 		TableHeader,
 		TableRow
 	} from "$lib/components/ui/table/index.js";
+	import {
+		AlertDialog,
+		AlertDialogAction,
+		AlertDialogCancel,
+		AlertDialogContent,
+		AlertDialogDescription,
+		AlertDialogFooter,
+		AlertDialogHeader,
+		AlertDialogTitle
+	} from "$lib/components/ui/alert-dialog/index.js";
 	import { getCustomer, createCustomer, updateCustomer } from "$lib/commands/customers.js";
 	import { getOrders } from "$lib/commands/orders.js";
+	import { getCustomerTokens, deletePaymentToken, setDefaultToken } from "$lib/commands/payment-tokens.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { formatCurrency } from "$lib/utils.js";
-	import type { Order } from "$lib/types/index.js";
+	import { toast } from "svelte-sonner";
+	import type { Order, CustomerPaymentToken } from "$lib/types/index.js";
 
 	const paramId = $derived(page.params.id as string);
 	const isNew = $derived(paramId === "new");
@@ -32,6 +44,9 @@
 	let saving = $state(false);
 	let error = $state("");
 	let orders = $state<Order[]>([]);
+	let paymentTokens = $state<CustomerPaymentToken[]>([]);
+	let deleteTokenDialogOpen = $state(false);
+	let tokenToDelete = $state<CustomerPaymentToken | null>(null);
 
 	// Form fields
 	let firstName = $state("");
@@ -51,6 +66,7 @@
 	let notes = $state("");
 
 	const currencySymbol = $derived(settingsStore.get("currency_symbol") || "$");
+	const cardOnFileEnabled = $derived(settingsStore.getBoolean("enable_card_on_file"));
 
 	const orderStats = $derived.by(() => {
 		const completed = orders.filter((o) => o.status === "completed");
@@ -85,6 +101,9 @@
 
 					// Load order history
 					orders = await getOrders({ customerId });
+
+					// Load saved payment tokens
+					paymentTokens = await getCustomerTokens(customerId);
 				} else {
 					error = "Customer not found.";
 				}
@@ -157,6 +176,65 @@
 			case "void": return "destructive";
 			case "refunded": return "outline";
 			default: return "secondary";
+		}
+	}
+
+	function formatCardBrand(brand: string | null): string {
+		if (!brand) return "Card";
+		const map: Record<string, string> = {
+			visa: "Visa",
+			mastercard: "MC",
+			amex: "Amex",
+			discover: "Disc",
+			Visa: "Visa",
+			Mastercard: "MC",
+			Amex: "Amex",
+			Discover: "Disc"
+		};
+		return map[brand] ?? brand;
+	}
+
+	function formatExpiry(month: number | null, year: number | null): string {
+		if (!month || !year) return "";
+		const m = String(month).padStart(2, "0");
+		const y = String(year).slice(-2);
+		return `${m}/${y}`;
+	}
+
+	function isExpired(month: number | null, year: number | null): boolean {
+		if (!month || !year) return false;
+		const now = new Date();
+		const expDate = new Date(year, month); // first of month after expiry
+		return expDate < now;
+	}
+
+	async function handleSetDefault(tokenId: number) {
+		if (!customerId) return;
+		try {
+			await setDefaultToken(customerId, tokenId);
+			paymentTokens = await getCustomerTokens(customerId);
+			toast.success("Default card updated");
+		} catch {
+			toast.error("Failed to update default card");
+		}
+	}
+
+	function confirmDeleteToken(token: CustomerPaymentToken) {
+		tokenToDelete = token;
+		deleteTokenDialogOpen = true;
+	}
+
+	async function handleDeleteToken() {
+		if (!tokenToDelete || !customerId) return;
+		try {
+			await deletePaymentToken(tokenToDelete.id);
+			paymentTokens = await getCustomerTokens(customerId);
+			toast.success("Card removed");
+		} catch {
+			toast.error("Failed to remove card");
+		} finally {
+			deleteTokenDialogOpen = false;
+			tokenToDelete = null;
 		}
 	}
 
@@ -387,6 +465,104 @@
 					</CardContent>
 				</Card>
 			</div>
+
+			<!-- Payment Methods (existing customers only, when card-on-file enabled) -->
+			{#if cardOnFileEnabled}
+				<div class="mt-6">
+					<Card>
+						<CardHeader>
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<CreditCard class="h-5 w-5" />
+									<CardTitle>Payment Methods</CardTitle>
+									{#if paymentTokens.length > 0}
+										<Badge variant="secondary">{paymentTokens.length}</Badge>
+									{/if}
+								</div>
+							</div>
+						</CardHeader>
+						<CardContent>
+							{#if paymentTokens.length === 0}
+								<p class="py-8 text-center text-sm text-muted-foreground">
+									No saved payment methods.
+								</p>
+							{:else}
+								<div class="space-y-2">
+									{#each paymentTokens as token (token.id)}
+										<div class="flex items-center justify-between rounded-md border p-3">
+											<div class="flex items-center gap-3">
+												<CreditCard class="h-5 w-5 text-muted-foreground" />
+												<div>
+													<div class="flex items-center gap-2">
+														<span class="text-sm font-medium">
+															{formatCardBrand(token.card_brand)}
+														</span>
+														<span class="font-mono text-sm text-muted-foreground">
+															**** {token.card_last_four}
+														</span>
+														{#if token.is_default}
+															<Badge variant="secondary">Default</Badge>
+														{/if}
+													</div>
+													<div class="flex items-center gap-2 text-xs text-muted-foreground">
+														{#if token.exp_month && token.exp_year}
+															<span class={isExpired(token.exp_month, token.exp_year) ? "text-destructive" : ""}>
+																Exp {formatExpiry(token.exp_month, token.exp_year)}
+															</span>
+														{/if}
+													</div>
+												</div>
+											</div>
+											<div class="flex items-center gap-1">
+												{#if !token.is_default}
+													<Button
+														variant="ghost"
+														size="sm"
+														onclick={() => handleSetDefault(token.id)}
+														title="Set as default"
+													>
+														<Star class="h-4 w-4" />
+													</Button>
+												{/if}
+												<Button
+													variant="ghost"
+													size="sm"
+													onclick={() => confirmDeleteToken(token)}
+													title="Remove card"
+												>
+													<Trash2 class="h-4 w-4 text-destructive" />
+												</Button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</CardContent>
+					</Card>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </div>
+
+<!-- Delete token confirmation dialog -->
+<AlertDialog bind:open={deleteTokenDialogOpen}>
+	<AlertDialogContent>
+		<AlertDialogHeader>
+			<AlertDialogTitle>Remove Payment Method?</AlertDialogTitle>
+			<AlertDialogDescription>
+				{#if tokenToDelete}
+					Remove card ending in {tokenToDelete.card_last_four}? This cannot be undone.
+				{/if}
+			</AlertDialogDescription>
+		</AlertDialogHeader>
+		<AlertDialogFooter>
+			<AlertDialogCancel onclick={() => { deleteTokenDialogOpen = false; tokenToDelete = null; }}>
+				Cancel
+			</AlertDialogCancel>
+			<AlertDialogAction onclick={handleDeleteToken}>
+				Remove
+			</AlertDialogAction>
+		</AlertDialogFooter>
+	</AlertDialogContent>
+</AlertDialog>
