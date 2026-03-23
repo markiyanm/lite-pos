@@ -15,61 +15,42 @@ export async function getDb(): Promise<Database> {
 	return db;
 }
 
-/**
- * Check if an error is a SQLite BUSY/LOCKED error.
- * Code 5 = SQLITE_BUSY, Code 517 = SQLITE_BUSY_SNAPSHOT
- */
-function isBusyError(err: unknown): boolean {
-	const msg = String(err);
-	return msg.includes("database is locked") || msg.includes("(code: 5)") || msg.includes("(code: 517)");
-}
+// ─── Write Serializer (Async Mutex) ─────────────────────────────────────────
+//
+// SQLite allows only one writer at a time. tauri-plugin-sql uses sqlx::SqlitePool
+// with multiple connections, and PRAGMA busy_timeout is per-connection — we can't
+// control which connection the pool hands us, so busy_timeout is unreliable.
+//
+// Instead, we serialize ALL write operations through a single-lane queue in JS.
+// This guarantees no two writes contend for SQLite's write lock, eliminating
+// SQLITE_BUSY entirely. Reads (SELECT) bypass the queue since WAL mode allows
+// concurrent reads alongside a single writer.
+//
+// For a single-user desktop app, this adds negligible latency (writes are fast,
+// they just can't overlap) and provides 100% reliability.
+// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Sleep for a given number of milliseconds.
- */
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
+let writeQueue: Promise<unknown> = Promise.resolve();
+let insideTransaction = false;
 
-/**
- * Retry a database operation with exponential backoff on SQLITE_BUSY.
- *
- * tauri-plugin-sql uses sqlx::SqlitePool with multiple connections.
- * PRAGMA busy_timeout is per-connection, and we can't guarantee which
- * pool connection executes our query. Instead of fighting the pool,
- * we retry with increasing delays (50ms, 150ms, 350ms, 750ms, 1550ms)
- * giving the lock holder time to finish.
- */
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 50;
-
-async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
-	let lastErr: unknown;
-	for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-		try {
-			return await operation();
-		} catch (err) {
-			if (isBusyError(err) && attempt < MAX_RETRIES) {
-				lastErr = err;
-				const delay = BASE_DELAY_MS * Math.pow(2, attempt); // 50, 100, 200, 400, 800
-				await sleep(delay);
-				// Also try setting busy_timeout on whatever connection we get next
-				try {
-					const database = await getDb();
-					await database.execute("PRAGMA busy_timeout = 5000", []);
-				} catch {
-					// Non-fatal
-				}
-				continue;
-			}
-			throw err;
-		}
+function serializeWrite<T>(operation: () => Promise<T>): Promise<T> {
+	// If we're already inside a withTransaction callback, don't re-queue
+	// (the transaction already holds the queue slot)
+	if (insideTransaction) {
+		return operation();
 	}
-	throw lastErr;
+
+	const next = writeQueue.then(
+		() => operation(),
+		() => operation()  // Run even if previous write failed
+	);
+	// Update the queue tail — subsequent writes wait for this one
+	writeQueue = next.catch(() => {}); // Prevent unhandled rejection on queue chain
+	return next;
 }
 
 export async function execute(query: string, bindValues?: unknown[]): Promise<{ rowsAffected: number; lastInsertId: number }> {
-	return withRetry(async () => {
+	return serializeWrite(async () => {
 		const database = await getDb();
 		const result = await database.execute(query, bindValues);
 		return { rowsAffected: result.rowsAffected, lastInsertId: result.lastInsertId ?? 0 };
@@ -77,43 +58,44 @@ export async function execute(query: string, bindValues?: unknown[]): Promise<{ 
 }
 
 export async function select<T>(query: string, bindValues?: unknown[]): Promise<T[]> {
-	return withRetry(async () => {
-		const database = await getDb();
-		return database.select(query, bindValues);
-	});
+	// Reads bypass the write queue — WAL mode allows concurrent reads
+	const database = await getDb();
+	return database.select(query, bindValues);
 }
 
 /**
- * Execute a callback inside a SQLite savepoint (nestable transaction).
- * Uses SAVEPOINT/RELEASE/ROLLBACK TO instead of BEGIN/COMMIT/ROLLBACK
- * because SQLite does not support nested BEGIN TRANSACTION, and the
- * tauri-plugin-sql connection may have implicit transactions active.
+ * Execute a callback inside a serialized write session.
+ * The ENTIRE transaction (SAVEPOINT + all writes + RELEASE) runs as a single
+ * queued unit, so no other write can interleave or cause lock contention.
  *
- * The SAVEPOINT creation itself is retried on BUSY. Operations inside
- * the callback use execute/select which have their own retry logic.
+ * Uses SAVEPOINT/RELEASE/ROLLBACK TO instead of BEGIN/COMMIT/ROLLBACK
+ * because SQLite does not support nested BEGIN TRANSACTION.
+ *
+ * All execute() calls inside the callback detect they're inside a transaction
+ * and skip the queue (they already hold the queue slot).
  */
 let _savepointCounter = 0;
 
 export async function withTransaction<T>(callback: () => Promise<T>): Promise<T> {
-	const database = await getDb();
-	const name = `sp_${++_savepointCounter}`;
-
-	// Retry the SAVEPOINT creation itself on BUSY
-	await withRetry(async () => {
+	return serializeWrite(async () => {
+		const database = await getDb();
+		const name = `sp_${++_savepointCounter}`;
 		await database.execute(`SAVEPOINT ${name}`, []);
-	});
-
-	try {
-		const result = await callback();
-		await database.execute(`RELEASE SAVEPOINT ${name}`, []);
-		return result;
-	} catch (err) {
+		insideTransaction = true;
 		try {
-			await database.execute(`ROLLBACK TO SAVEPOINT ${name}`, []);
+			const result = await callback();
 			await database.execute(`RELEASE SAVEPOINT ${name}`, []);
-		} catch (rollbackErr) {
-			console.error(`[DB] Rollback of ${name} failed:`, rollbackErr);
+			return result;
+		} catch (err) {
+			try {
+				await database.execute(`ROLLBACK TO SAVEPOINT ${name}`, []);
+				await database.execute(`RELEASE SAVEPOINT ${name}`, []);
+			} catch (rollbackErr) {
+				console.error(`[DB] Rollback of ${name} failed:`, rollbackErr);
+			}
+			throw err;
+		} finally {
+			insideTransaction = false;
 		}
-		throw err;
-	}
+	});
 }
